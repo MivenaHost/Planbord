@@ -1314,7 +1314,7 @@ function fInitialen(ini) {
 }
 
 function bcDeepLink(type, item) {
-  const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/ui`;
+  const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}`;
   const co   = encodeURIComponent(BC_CO_NAME);
   const ref  = encodeURIComponent((item._no || item.ref || '').replace(/['"]/g, ''));
   const page = type === 'inkoop' ? 50 : 42;
@@ -1796,11 +1796,13 @@ async function showDetail(idx) {
            <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
            Open in Business Central
          </a>` : '';
-    // Haal orderregels op
-    if (item._id && bcConnected) {
+    // Haal orderregels op via REST API (zoek eerst op ordernummer → id)
+    if (bcConnected && item._no) {
       try {
-        const lr = await bcGet(`/companies(${bcCompanyId})/salesOrders(${item._id})/salesOrderLines`);
-        const lines = (lr.value || []).filter(l => l.lineType === 'Item' || l.lineType === 'item' || l.type === 'Item');
+        const orderRes = await bcGet(`/companies(${bcCompanyId})/salesOrders?$filter=number eq '${encodeURIComponent(item._no)}'&$expand=salesOrderLines`);
+        const order = (orderRes.value || [])[0];
+        const lines = (order?.salesOrderLines?.value || []).filter(l =>
+          l.lineType === 'Item' || l.lineType === 'item' || l.type === 'Item' || l.description);
         let lhtml = lines.length
           ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
                <tr style="border-bottom:1px solid var(--line);opacity:.6"><th style="text-align:left;padding:4px 2px">Artikel</th><th style="text-align:right;padding:4px 2px">Aantal</th><th style="text-align:right;padding:4px 2px">Eenheid</th></tr>
