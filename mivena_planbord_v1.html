@@ -1318,8 +1318,7 @@ function bcDeepLink(type, item) {
   const co   = encodeURIComponent(BC_CO_NAME);
   const no   = (item._no || item.ref || '').replace(/['"]/g, '');
   const page = type === 'inkoop' ? 50 : 42;
-  const filter = encodeURIComponent(`No IS '${no}'`);
-  return `${base}?company=${co}&page=${page}&filter=${filter}`;
+  return `${base}?company=${co}&page=${page}&filter=No%20IS%20'${no}'`;
 }
 
 function fDateNL(str) {
