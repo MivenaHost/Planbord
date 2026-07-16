@@ -1316,9 +1316,10 @@ function fInitialen(ini) {
 function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
   const co   = encodeURIComponent(BC_CO_NAME);
-  const ref  = encodeURIComponent((item._no || item.ref || '').replace(/['"]/g, ''));
+  const no   = (item._no || item.ref || '').replace(/['"]/g, '');
   const page = type === 'inkoop' ? 50 : 42;
-  return `${base}?company=${co}&page=${page}&filter='No'%20IS%20'${ref}'`;
+  const filter = encodeURIComponent(`No IS '${no}'`);
+  return `${base}?company=${co}&page=${page}&filter=${filter}`;
 }
 
 function fDateNL(str) {
@@ -1796,28 +1797,37 @@ async function showDetail(idx) {
            <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
            Open in Business Central
          </a>` : '';
-    // Haal orderregels op via REST API (zoek eerst op ordernummer → id)
+    // Haal orderregels op: stap 1 → zoek systemId op ordernummer, stap 2 → haal regels op
     if (bcConnected && item._no) {
       try {
-        const orderRes = await bcGet(`/companies(${bcCompanyId})/salesOrders?$filter=number eq '${encodeURIComponent(item._no)}'&$expand=salesOrderLines`);
-        const order = (orderRes.value || [])[0];
-        const lines = (order?.salesOrderLines?.value || []).filter(l =>
-          l.lineType === 'Item' || l.lineType === 'item' || l.type === 'Item' || l.description);
-        let lhtml = lines.length
-          ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
-               <tr style="border-bottom:1px solid var(--line);opacity:.6"><th style="text-align:left;padding:4px 2px">Artikel</th><th style="text-align:right;padding:4px 2px">Aantal</th><th style="text-align:right;padding:4px 2px">Eenheid</th></tr>
-               ${lines.map(l=>`<tr style="border-bottom:1px solid #f5f5f5">
-                 <td style="padding:5px 2px">${escHtml(l.description||l.itemId||'—')}</td>
-                 <td style="text-align:right;padding:5px 2px">${l.quantity||0}</td>
-                 <td style="text-align:right;padding:5px 2px">${escHtml(l.unitOfMeasureCode||'')}</td>
-               </tr>`).join('')}
-             </table>`
-          : '<span style="opacity:.5;font-size:12px">Geen itemregels gevonden</span>';
+        const orderRes = await bcGet(`/companies(${bcCompanyId})/salesOrders?$filter=number eq '${item._no}'&$select=id`);
+        const orderId = (orderRes.value || [])[0]?.id;
+        let lhtml = '<span style="opacity:.4;font-size:12px">Geen regels gevonden</span>';
+        if (orderId) {
+          const linesRes = await bcGet(`/companies(${bcCompanyId})/salesOrders(${orderId})/salesOrderLines`);
+          const lines = (linesRes.value || []).filter(l => l.lineType === 'Item' || l.lineType === 'item');
+          if (lines.length) {
+            lhtml = `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
+              <thead><tr style="border-bottom:2px solid var(--line)">
+                <th style="text-align:left;padding:5px 4px;opacity:.6;font-weight:600">Omschrijving</th>
+                <th style="text-align:right;padding:5px 4px;opacity:.6;font-weight:600">Aantal</th>
+                <th style="text-align:right;padding:5px 4px;opacity:.6;font-weight:600">Assembleren</th>
+                <th style="text-align:right;padding:5px 4px;opacity:.6;font-weight:600">Eenheid</th>
+              </tr></thead>
+              <tbody>${lines.map(l => `<tr style="border-bottom:1px solid #f0f0f0">
+                <td style="padding:6px 4px">${escHtml(l.description || '—')}</td>
+                <td style="text-align:right;padding:6px 4px">${l.quantity ?? '—'}</td>
+                <td style="text-align:right;padding:6px 4px">${l.quantityToAssemble ?? '—'}</td>
+                <td style="text-align:right;padding:6px 4px">${escHtml(l.unitOfMeasureCode || '')}</td>
+              </tr>`).join('')}</tbody>
+            </table>`;
+          }
+        }
         const lb = document.getElementById('linesBlock');
-        if (lb) lb.innerHTML = `<div style="font-weight:600;font-size:12px;margin-bottom:6px;opacity:.7">Orderregels</div>${lhtml}`;
+        if (lb) lb.innerHTML = `<div style="font-weight:600;font-size:12px;margin-bottom:6px;margin-top:14px;color:var(--ink)">Orderregels</div>${lhtml}`;
       } catch(e) {
         const lb = document.getElementById('linesBlock');
-        if (lb) lb.innerHTML = '<span style="opacity:.4;font-size:12px">Regels niet beschikbaar</span>';
+        if (lb) lb.innerHTML = '<span style="opacity:.4;font-size:12px">Regels konden niet worden geladen</span>';
       }
     } else {
       const lb = document.getElementById('linesBlock');
