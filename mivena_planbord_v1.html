@@ -1316,10 +1316,8 @@ function fInitialen(ini) {
 function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
   const co   = encodeURIComponent(BC_CO_NAME);
-  const no   = (item._no || item.ref || '').replace(/['"]/g, '');
-  const page = type === 'inkoop' ? 9307 : 9305;
-  // Gebruik geen href maar window.open() via bcOpenLink() om URL-codering te vermijden
-  return `${base}?company=${co}&page=${page}&filter=No IS '${no}'`;
+  const page = type === 'inkoop' ? 50 : 42;
+  return `${base}?company=${co}&page=${page}`;
 }
 function bcOpenLink(type, item) {
   window.open(bcDeepLink(type, item), '_blank');
