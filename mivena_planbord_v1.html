@@ -1314,7 +1314,7 @@ function fInitialen(ini) {
 }
 
 function bcDeepLink(type, item) {
-  const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}`;
+  const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
   const co   = encodeURIComponent(BC_CO_NAME);
   const ref  = encodeURIComponent((item._no || item.ref || '').replace(/['"]/g, ''));
   const page = type === 'inkoop' ? 50 : 42;
