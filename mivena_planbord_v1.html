@@ -1881,8 +1881,8 @@ async function patchDate(state, newDateStr) {
     } else if (type === 'productie' && item._no) {
       const coName  = encodeURIComponent(BC_CO_NAME);
       const aoUrl   = `${BC_ODATA}/Company('${coName}')/AssemblyOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`;
-      // Alleen Due_Date (Vervaldatum) bijwerken — geen validatieconflict met Starting_Date
-      await bcPatch(aoUrl, { Due_Date: newDateStr }, item._etag || '*');
+      // Beide datums gelijktijdig patchen → Starting_Date == Due_Date, geen validatiefout
+      await bcPatch(aoUrl, { Starting_Date: newDateStr, Due_Date: newDateStr }, item._etag || '*');
       showToast('✓ Datum bijgewerkt in BC');
       await refreshBCData();
     } else {
