@@ -1288,7 +1288,7 @@ async function refreshBCData() {
     const [poRes, soRes, aoRes, prRes, ssRes] = await Promise.all([
       bcGet(`${BC_ODATA}/Company('${coName}')/PurchaseOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`).catch(() => null),
       bcGet(`${BC_ODATA}/Company('${coName}')/SalesOrders?$filter=Promised_Delivery_Date ge ${sd} and Promised_Delivery_Date le ${ed}`),
-      bcGet(`${BC_ODATA}/Company('${coName}')/AssemblyOrders?$filter=Starting_Date ge ${sd} and Starting_Date le ${ed}`),
+      bcGet(`${BC_ODATA}/Company('${coName}')/AssemblyOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`),
       bcGet(`/companies(${bcCompanyId})/purchaseReceipts?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=purchaseReceiptLines`).catch(() => ({value:[]})),
       bcGet(`/companies(${bcCompanyId})/salesShipments?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=salesShipmentLines`).catch(() => ({value:[]}))
     ]);
@@ -1440,7 +1440,7 @@ function transformAO(res) {
   (res.value || []).forEach(ao => {
     const no = ao.No || ao.No_ || '';
     out.push({
-      date:      (ao.Starting_Date || '').substring(0, 10),
+      date:      (ao.Due_Date || '').substring(0, 10),
       dueDate:   (ao.Due_Date || '').substring(0, 10),
       ref:       no || '—',
       batch:     no || '—',
@@ -1766,8 +1766,7 @@ function showDetail(idx) {
       ${item.itemNo ? `<div class="drow"><span class="dlbl">Artikelnummer</span><span class="dval">${item.itemNo}</span></div>` : ''}
       <div class="drow"><span class="dlbl">Omschrijving</span><span class="dval">${item.artikel}</span></div>
       <div class="drow"><span class="dlbl">Hoeveelheid</span><span class="dval"><b>${fKg(item.kg)}</b></span></div>
-      <div class="drow"><span class="dlbl">Startdatum</span><span class="dval">${fDateNL(item.date)}</span></div>
-      ${item.dueDate && item.dueDate !== '0001-01-01' ? `<div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval">${fDateNL(item.dueDate)}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval">${fDateNL(item.date)}</span></div>
       ${item.locatie ? `<div class="drow"><span class="dlbl">Locatie</span><span class="dval">${item.locatie}</span></div>` : ''}
       <div class="drow"><span class="dlbl">Status</span><span class="dval"><span class="pi-badge ${item.status}" style="font-size:11px;padding:2px 9px">${lbl}</span></span></div>
       ${item.opmerking ? `<div class="m-note"><strong>Opmerking</strong><br>${item.opmerking}</div>` : ''}`;
@@ -1882,17 +1881,8 @@ async function patchDate(state, newDateStr) {
     } else if (type === 'productie' && item._no) {
       const coName  = encodeURIComponent(BC_CO_NAME);
       const aoUrl   = `${BC_ODATA}/Company('${coName}')/AssemblyOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`;
-      // BC valideert Starting_Date <= Due_Date per veld afzonderlijk.
-      // oldDate = oorspronkelijke datum (item.date is al overschreven door optimistic update)
-      if (new Date(newDateStr) >= new Date(oldDate)) {
-        // Naar voren: eerst Due_Date verhogen, dan Starting_Date
-        await bcPatch(aoUrl, { Due_Date: newDateStr }, '*');
-        await bcPatch(aoUrl, { Starting_Date: newDateStr }, '*');
-      } else {
-        // Naar achteren: eerst Starting_Date verlagen, dan Due_Date
-        await bcPatch(aoUrl, { Starting_Date: newDateStr }, '*');
-        await bcPatch(aoUrl, { Due_Date: newDateStr }, '*');
-      }
+      // Alleen Due_Date (Vervaldatum) bijwerken — geen validatieconflict met Starting_Date
+      await bcPatch(aoUrl, { Due_Date: newDateStr }, item._etag || '*');
       showToast('✓ Datum bijgewerkt in BC');
       await refreshBCData();
     } else {
