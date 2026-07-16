@@ -1285,16 +1285,16 @@ async function refreshBCData() {
   updateBCButton('bezig');
   const coName = encodeURIComponent(BC_CO_NAME);
   try {
-    const [poRes, soRes, aoRes, prRes, ssRes] = await Promise.all([
+    const [poRes, soRes, soPrdRes, prRes, ssRes] = await Promise.all([
       bcGet(`${BC_ODATA}/Company('${coName}')/PurchaseOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`).catch(() => null),
       bcGet(`${BC_ODATA}/Company('${coName}')/SalesOrders?$filter=Promised_Delivery_Date ge ${sd} and Promised_Delivery_Date le ${ed}`),
-      bcGet(`${BC_ODATA}/Company('${coName}')/AssemblyOrders?$filter=Starting_Date ge ${sd} and Starting_Date le ${ed}`),
+      bcGet(`${BC_ODATA}/Company('${coName}')/SalesOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`).catch(() => null),
       bcGet(`/companies(${bcCompanyId})/purchaseReceipts?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=purchaseReceiptLines`).catch(() => ({value:[]})),
       bcGet(`/companies(${bcCompanyId})/salesShipments?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=salesShipmentLines`).catch(() => ({value:[]}))
     ]);
     liveData = {
       inkoop:    [...transformPO(poRes), ...transformPR(prRes)],
-      productie: transformAO(aoRes),
+      productie: transformSO_Prd(soPrdRes),
       transport: [...transformSO(soRes), ...transformSS(ssRes)]
     };
     render();
@@ -1317,7 +1317,7 @@ function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/ui`;
   const co   = encodeURIComponent(BC_CO_NAME);
   const ref  = encodeURIComponent((item._no || item.ref || '').replace(/['"]/g, ''));
-  const page = type === 'inkoop' ? 50 : type === 'productie' ? 900 : 42;
+  const page = type === 'inkoop' ? 50 : 42;
   return `${base}?company=${co}&page=${page}&filter='No'%20IS%20'${ref}'`;
 }
 
@@ -1406,6 +1406,29 @@ function transformSO(res) {
   return out;
 }
 
+function transformSO_Prd(res) {
+  // Verkooporders voor productie — gefilterd op Due_Date (Vervaldatum)
+  if (!res) return [];
+  const out = [];
+  (res.value || []).forEach(so => {
+    const no    = so.No || so.number || '—';
+    const klant = so.Sell_to_Customer_Name || so.customerName || '—';
+    const datum = (so.Due_Date || '').substring(0, 10);
+    if (!datum || datum === '0001-01-01') return;
+    out.push({
+      date:      datum,
+      ref:       no,
+      klant:     klant,
+      orderDatum:(so.Order_Date || '').substring(0, 10),
+      status:    'open',
+      _id:       so.SystemId || so.id || null,
+      _no:       no,
+      _etag:     so['@odata.etag'] || '*'
+    });
+  });
+  return out;
+}
+
 function transformSS(res) {
   const out = [];
   (res.value || []).forEach(ss => {
@@ -1440,7 +1463,7 @@ function transformAO(res) {
   (res.value || []).forEach(ao => {
     const no = ao.No || ao.No_ || '';
     out.push({
-      date:      (ao.Starting_Date || '').substring(0, 10),
+      date:      (ao.Due_Date || '').substring(0, 10),
       dueDate:   (ao.Due_Date || '').substring(0, 10),
       ref:       no || '—',
       batch:     no || '—',
@@ -1593,10 +1616,9 @@ function dayColumn(date, todayStr, srcInk, srcPrd, srcTrn) {
 
         return `<div class="pi prd s-${item.status||'open'}" ${drg} onclick="showDetail(${i})">
           <div class="pi-top">
-            <span class="pi-name">${escHtml(item.artikel||'—')}</span>
-            <span class="pi-badge ${item.status||'open'}">${lbl}</span>
+            <span class="pi-name">${escHtml(item.klant||item.artikel||'—')}</span>
           </div>
-          <div class="pi-meta">${escHtml(item.batch||item.ref||'—')} · ${fKg(item.kg)}</div>
+          <div class="pi-meta">${escHtml(item.ref||'—')}</div>
         </div>`;
       }).join('')
     : `<div class="no-items">${liveData?.productie ? 'Geen orders in BC' : 'Geen productie'}</div>`;
@@ -1737,14 +1759,14 @@ function goToToday() {
 /* ══════════════════════════════════════════
    MODAL
    ══════════════════════════════════════════ */
-function showDetail(idx) {
+async function showDetail(idx) {
   const {type, item, date} = store[idx];
   const dl = `${DAGEN_L[date.getDay()]} ${date.getDate()} ${MAANDEN[date.getMonth()]} ${date.getFullYear()}`;
   const badge = document.getElementById('mBadge');
   badge.className = 'm-badge ' + type;
   badge.textContent = type.charAt(0).toUpperCase() + type.slice(1);
   document.getElementById('mTitle').textContent =
-    type === 'transport' ? (item.klant || '—') : (item.artikel || '—');
+    (type === 'transport' || type === 'productie') ? (item.klant || '—') : (item.artikel || '—');
   document.getElementById('mDate').textContent  = dl;
 
   let rows = '';
@@ -1760,17 +1782,46 @@ function showDetail(idx) {
       ${item.prijs ? `<div class="drow"><span class="dlbl">Prijs p/e</span><span class="dval">€&nbsp;${item.prijs.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>` : ''}
       ${item.opmerking ? `<div class="m-note"><strong>Opmerking</strong><br>${item.opmerking}</div>` : ''}`;
   } else if (type === 'productie') {
-    const lbl = {open:'Open',afgehandeld:'Afgehandeld'}[item.status] || item.status;
     rows = `
       <div class="drow"><span class="dlbl">Ordernummer</span><span class="dval">${item.ref}</span></div>
-      ${item.itemNo ? `<div class="drow"><span class="dlbl">Artikelnummer</span><span class="dval">${item.itemNo}</span></div>` : ''}
-      <div class="drow"><span class="dlbl">Omschrijving</span><span class="dval">${item.artikel}</span></div>
-      <div class="drow"><span class="dlbl">Hoeveelheid</span><span class="dval"><b>${fKg(item.kg)}</b></span></div>
-      <div class="drow"><span class="dlbl">Startdatum</span><span class="dval">${fDateNL(item.date)}</span></div>
-      ${item.dueDate ? `<div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval">${fDateNL(item.dueDate)}</span></div>` : ''}
-      ${item.locatie ? `<div class="drow"><span class="dlbl">Locatie</span><span class="dval">${item.locatie}</span></div>` : ''}
-      <div class="drow"><span class="dlbl">Status</span><span class="dval"><span class="pi-badge ${item.status}" style="font-size:11px;padding:2px 9px">${lbl}</span></span></div>
-      ${item.opmerking ? `<div class="m-note"><strong>Opmerking</strong><br>${item.opmerking}</div>` : ''}`;
+      <div class="drow"><span class="dlbl">Klant</span><span class="dval">${item.klant||'—'}</span></div>
+      ${item.orderDatum ? `<div class="drow"><span class="dlbl">Orderdatum</span><span class="dval">${fDateNL(item.orderDatum)}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval"><b>${fDateNL(item.date)}</b></span></div>`;
+    document.getElementById('mBody').innerHTML = rows + `<div id="linesBlock" style="margin-top:12px;opacity:.5;font-size:12px">Orderregels laden…</div>`;
+    document.getElementById('modal').classList.add('show');
+    // BC deeplink
+    const foot = document.getElementById('mFoot');
+    foot.innerHTML = (bcConnected && item.ref && item.ref !== '—')
+      ? `<a href="${bcDeepLink(type, item)}" target="_blank" class="bc-open-btn">
+           <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+           Open in Business Central
+         </a>` : '';
+    // Haal orderregels op
+    if (item._id && bcConnected) {
+      try {
+        const lr = await bcGet(`/companies(${bcCompanyId})/salesOrders(${item._id})/salesOrderLines`);
+        const lines = (lr.value || []).filter(l => l.lineType === 'Item' || l.lineType === 'item' || l.type === 'Item');
+        let lhtml = lines.length
+          ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
+               <tr style="border-bottom:1px solid var(--line);opacity:.6"><th style="text-align:left;padding:4px 2px">Artikel</th><th style="text-align:right;padding:4px 2px">Aantal</th><th style="text-align:right;padding:4px 2px">Eenheid</th></tr>
+               ${lines.map(l=>`<tr style="border-bottom:1px solid #f5f5f5">
+                 <td style="padding:5px 2px">${escHtml(l.description||l.itemId||'—')}</td>
+                 <td style="text-align:right;padding:5px 2px">${l.quantity||0}</td>
+                 <td style="text-align:right;padding:5px 2px">${escHtml(l.unitOfMeasureCode||'')}</td>
+               </tr>`).join('')}
+             </table>`
+          : '<span style="opacity:.5;font-size:12px">Geen itemregels gevonden</span>';
+        const lb = document.getElementById('linesBlock');
+        if (lb) lb.innerHTML = `<div style="font-weight:600;font-size:12px;margin-bottom:6px;opacity:.7">Orderregels</div>${lhtml}`;
+      } catch(e) {
+        const lb = document.getElementById('linesBlock');
+        if (lb) lb.innerHTML = '<span style="opacity:.4;font-size:12px">Regels niet beschikbaar</span>';
+      }
+    } else {
+      const lb = document.getElementById('linesBlock');
+      if (lb) lb.innerHTML = '';
+    }
+    return; // modal al geopend
   } else {
     const adresLijst = [item.adres, item.stad].filter(Boolean).join(', ');
     rows = `
@@ -1880,14 +1931,10 @@ async function patchDate(state, newDateStr) {
       showToast('✓ Datum bijgewerkt in BC');
       await refreshBCData();
     } else if (type === 'productie' && item._no) {
-      const coName  = encodeURIComponent(BC_CO_NAME);
-      const aoUrl   = `${BC_ODATA}/Company('${coName}')/AssemblyOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`;
-      // Valideer: nieuwe startdatum mag niet na de vervaldatum liggen
-      if (item.dueDate && newDateStr > item.dueDate) {
-        throw new Error(`Startdatum mag niet na vervaldatum (${fDateNL(item.dueDate)}) liggen`);
-      }
-      await bcPatch(aoUrl, { Starting_Date: newDateStr }, item._etag || '*');
-      showToast('✓ Datum bijgewerkt in BC');
+      const coNameSO = encodeURIComponent(BC_CO_NAME);
+      await bcPatch(`${BC_ODATA}/Company('${coNameSO}')/SalesOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`,
+        { Due_Date: newDateStr }, item._etag || '*');
+      showToast('✓ Vervaldatum bijgewerkt in BC');
       await refreshBCData();
     } else {
       // Geen BC-koppeling voor dit item → alleen lokaal
