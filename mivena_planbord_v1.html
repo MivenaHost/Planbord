@@ -1317,7 +1317,7 @@ function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
   const co   = encodeURIComponent(BC_CO_NAME);
   const page = type === 'inkoop' ? 50 : 42;
-  return `${base}?company=${co}&page=${page}`;
+  return `${base}?company=${co}&page=${page}&dc=0`;
 }
 function bcOpenLink(type, item) {
   window.open(bcDeepLink(type, item), '_blank');
@@ -1791,13 +1791,7 @@ async function showDetail(idx) {
       <div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval"><b>${fDateNL(item.date)}</b></span></div>`;
     document.getElementById('mBody').innerHTML = rows + `<div id="linesBlock" style="margin-top:12px;opacity:.5;font-size:12px">Orderregels laden…</div>`;
     document.getElementById('modal').classList.add('show');
-    // BC deeplink
-    const foot = document.getElementById('mFoot');
-    foot.innerHTML = (bcConnected && item.ref && item.ref !== '—')
-      ? `<button class="bc-open-btn" onclick="bcOpenLink('${type}', store[${idx}].item)">
-           <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-           Open in Business Central
-         </button>` : '';
+    document.getElementById('mFoot').innerHTML = '';
     // Haal orderregels op: stap 1 → zoek systemId op ordernummer, stap 2 → haal regels op
     if (bcConnected && item._no) {
       try {
@@ -1851,12 +1845,7 @@ async function showDetail(idx) {
 
   // BC deeplink knop
   const foot = document.getElementById('mFoot');
-  const canLink = bcConnected && item.ref && item.ref !== '—';
-  foot.innerHTML = canLink
-    ? `<button class="bc-open-btn" onclick="bcOpenLink('${type}', store[${idx}].item)">
-         <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-         Open in Business Central
-       </button>` : '';
+  foot.innerHTML = '';
 
   document.getElementById('modal').classList.add('show');
 }
