@@ -1317,8 +1317,12 @@ function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
   const co   = encodeURIComponent(BC_CO_NAME);
   const no   = (item._no || item.ref || '').replace(/['"]/g, '');
-  const page = type === 'inkoop' ? 50 : 42;
-  return `${base}?company=${co}&page=${page}&filter=No%20IS%20'${no}'`;
+  const page = type === 'inkoop' ? 9307 : 9305;
+  // Gebruik geen href maar window.open() via bcOpenLink() om URL-codering te vermijden
+  return `${base}?company=${co}&page=${page}&filter=No IS '${no}'`;
+}
+function bcOpenLink(type, item) {
+  window.open(bcDeepLink(type, item), '_blank');
 }
 
 function fDateNL(str) {
@@ -1792,10 +1796,10 @@ async function showDetail(idx) {
     // BC deeplink
     const foot = document.getElementById('mFoot');
     foot.innerHTML = (bcConnected && item.ref && item.ref !== '—')
-      ? `<a href="${bcDeepLink(type, item)}" target="_blank" class="bc-open-btn">
+      ? `<button class="bc-open-btn" onclick="bcOpenLink('${type}', store[${idx}].item)">
            <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
            Open in Business Central
-         </a>` : '';
+         </button>` : '';
     // Haal orderregels op: stap 1 → zoek systemId op ordernummer, stap 2 → haal regels op
     if (bcConnected && item._no) {
       try {
@@ -1851,10 +1855,10 @@ async function showDetail(idx) {
   const foot = document.getElementById('mFoot');
   const canLink = bcConnected && item.ref && item.ref !== '—';
   foot.innerHTML = canLink
-    ? `<a href="${bcDeepLink(type, item)}" target="_blank" class="bc-open-btn">
+    ? `<button class="bc-open-btn" onclick="bcOpenLink('${type}', store[${idx}].item)">
          <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
          Open in Business Central
-       </a>` : '';
+       </button>` : '';
 
   document.getElementById('modal').classList.add('show');
 }
