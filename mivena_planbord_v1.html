@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Mivena — Planbord</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js"></script>
+<style>
+:root {
+  --forest:      #1B4332;
+  --forest-deep: #10291D;
+  --leaf:        #52B788;
+  --leaf-2:      #74C69D;
+  --leaf-soft:   #D8EFE2;
+  --amber:       #E8A23D;
+  --amber-soft:  #FBEBD2;
+  --bg:          #EAEFE7;
+  --surface:     #FFFFFF;
+  --ink:         #16201A;
+  --muted:       #7A8577;
+  --line:        #E2E8DC;
+  --done:        #2D7A4F;
+  --c-ink: #2558A0;
+  --c-prd: #C07018;
+  --c-trn: #1E7A4A;
+  --sec-h: 138px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background:
+    radial-gradient(1100px 420px at 50% -150px, rgba(82,183,136,.09), transparent),
+    var(--bg);
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── FRAME NOTE ─────────────────────────── */
+.frame-note {
+  background: var(--amber-soft);
+  border-bottom: 1px solid #E0C898;
+  padding: 6px 22px;
+  font-size: 11.5px;
+  color: #7A4E1E;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  transition: background .3s, border-color .3s;
+}
+.pill {
+  color: #fff;
+  font-weight: 700;
+  font-size: 9.5px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--amber);
+  transition: background .3s;
+}
+
+/* ── APP HEADER ─────────────────────────── */
+.app-head {
+  background: linear-gradient(150deg, var(--forest) 0%, var(--forest-deep) 100%);
+  color: #EAF3EC;
+  padding: 13px 22px 11px;
+  position: relative;
+  flex: none;
+}
+.app-head::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, var(--leaf), var(--leaf-2));
+}
+.head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.brand-logo {
+  background: #fff;
+  border-radius: 7px;
+  padding: 5px 10px;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 2px 8px -3px rgba(0,0,0,.4);
+  flex: none;
+}
+.brand-logo img { height: 21px; display: block; }
+.logo-fb {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .06em;
+  color: var(--forest-deep);
+}
+.head-text { flex: 1; min-width: 0; }
+.head-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+}
+.head-sub { font-size: 11px; color: #9FC9AE; margin-top: 2px; }
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(234,243,236,.75);
+  font-weight: 500;
+}
+.leg-dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+/* gebruikersbadge */
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.18);
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  color: #EAF3EC;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.user-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--leaf);
+  flex: none;
+  box-shadow: 0 0 0 2.5px rgba(82,183,136,.3);
+}
+
+/* BC verbinden knop */
+.btn-bc {
+  background: rgba(255,255,255,.13);
+  border: 1.5px solid rgba(255,255,255,.22);
+  color: #EAF3EC;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .14s, border-color .14s;
+  white-space: nowrap;
+}
+.btn-bc:hover { background: rgba(255,255,255,.22); }
+.btn-bc.connected { background: rgba(82,183,136,.22); border-color: rgba(82,183,136,.45); }
+.bc-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.bc-dot.ok     { background: var(--leaf); box-shadow: 0 0 0 2px rgba(82,183,136,.35); }
+.bc-dot.busy   { background: var(--amber); animation: bcpulse .9s infinite; }
+.bc-dot.err    { background: #E05050; }
+@keyframes bcpulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── DRAG & DROP ─────────────────────── */
+.pi[draggable="true"] { cursor: grab; }
+.pi[draggable="true"]:active { cursor: grabbing; }
+.pi.dragging { opacity: .3; transform: scale(.97); transition: opacity .1s, transform .1s; }
+.cat-body.drag-over {
+  background: rgba(82,183,136,.13);
+  border-radius: 8px;
+  outline: 2px dashed var(--leaf);
+  outline-offset: 2px;
+  min-height: 48px;
+}
+.cat-body.drag-reject {
+  background: rgba(224,80,80,.07);
+  border-radius: 8px;
+  outline: 2px dashed #E05050;
+  outline-offset: 2px;
+}
+
+/* ── LOGIN SCHERM ─────────────────────── */
+#loginScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(150deg, var(--forest) 0%, var(--forest-deep) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#loginScreen.hidden { display: none; }
+.login-card {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  padding: 52px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  max-width: 420px;
+  width: 90%;
+}
+.login-logo {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 22px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.28);
+}
+.login-logo img { height: 28px; display: block; }
+.login-logo-fb {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--forest-deep);
+}
+.login-title {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: #EAF3EC;
+  text-align: center;
+  margin-bottom: -10px;
+}
+.login-sub {
+  font-size: 12.5px;
+  color: rgba(234,243,236,.55);
+  text-align: center;
+}
+.login-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.login-input {
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 9px;
+  color: #EAF3EC;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  padding: 12px 14px;
+  outline: none;
+  width: 100%;
+  transition: border-color .15s, background .15s;
+}
+.login-input::placeholder { color: rgba(234,243,236,.35); }
+.login-input:focus { border-color: var(--leaf); background: rgba(255,255,255,.15); }
+.btn-login-ms {
+  background: var(--leaf);
+  color: var(--forest-deep);
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 13px 28px;
+  border-radius: 9px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+  transition: background .15s, transform .12s;
+}
+.btn-login-ms:hover:not(:disabled) { background: var(--leaf-2); transform: translateY(-1px); }
+.btn-login-ms:active { transform: translateY(0); }
+.btn-login-ms:disabled { opacity: .55; cursor: default; }
+.login-error {
+  color: #F28B82;
+  font-size: 12.5px;
+  text-align: center;
+  min-height: 18px;
+}
+.login-footer {
+  font-size: 11px;
+  color: rgba(234,243,236,.3);
+  text-align: center;
+  max-width: 300px;
+  line-height: 1.6;
+}
+
+.btn-today {
+  background: rgba(255,255,255,.13);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #EAF3EC;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .14s;
+  white-space: nowrap;
+}
+.btn-today:hover { background: rgba(255,255,255,.22); }
+.btn-today svg { width: 13px; height: 13px; }
+
+/* ── WEEK NAVIGATION ────────────────────── */
+.week-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: stretch;
+  flex: none;
+}
+.wbtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 20px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--forest);
+  transition: background .12s;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.wbtn:last-child { border-right: none; border-left: 1px solid var(--line); }
+.wbtn:hover:not(:disabled) { background: var(--leaf-soft); }
+.wbtn:disabled { color: var(--muted); cursor: default; }
+.wbtn svg { width: 15px; height: 15px; flex: none; }
+
+.week-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  gap: 20px;
+}
+.week-id-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.week-id-top {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.week-label-sm {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+}
+.week-num {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 32px;
+  color: var(--forest-deep);
+  line-height: 1;
+}
+.current-badge {
+  background: var(--leaf-soft);
+  color: var(--done);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.week-range {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wc-divider {
+  width: 1px;
+  height: 34px;
+  background: var(--line);
+  flex: none;
+}
+.week-totals { display: flex; align-items: center; }
+.wt-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+  padding: 0 14px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.wt-item:first-child { padding-left: 0; }
+.wt-item:last-child  { border-right: none; }
+.wt-dot { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.wt-val { font-weight: 600; color: var(--ink); }
+
+/* ── TIMELINE ───────────────────────────── */
+.tl-wrap {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding: 18px 18px 30px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--leaf) var(--leaf-soft);
+}
+.tl-wrap::-webkit-scrollbar { height: 5px; width: 5px; }
+.tl-wrap::-webkit-scrollbar-track { background: var(--leaf-soft); border-radius: 10px; }
+.tl-wrap::-webkit-scrollbar-thumb { background: var(--leaf); border-radius: 10px; }
+
+.timeline { display: grid; gap: 9px; }
+
+/* ── WEEKEND ────────────────────────────── */
+.wknd-closed {
+  background: #F2F5F0;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background .14s, border-color .14s;
+  user-select: none;
+  min-height: 220px;
+}
+.wknd-closed:hover { background: var(--leaf-soft); border-color: var(--leaf); }
+.wknd-closed-lbl {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wknd-closed-icon { color: var(--muted); }
+.wknd-closed-icon svg { width: 15px; height: 15px; }
+
+/* ── DAY CARD ───────────────────────────── */
+.day-card {
+  background: var(--surface);
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 4px rgba(16,41,29,.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.day-card.weekend { background: #F5F8F3; border-color: #E6EBE1; }
+.day-card.today   { border-color: var(--leaf); box-shadow: 0 0 0 1px var(--leaf), 0 4px 14px -4px rgba(27,67,50,.25); }
+
+.day-hd {
+  padding: 11px 13px 9px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  text-align: center;
+}
+.day-card.today .day-hd { background: linear-gradient(135deg, var(--forest), var(--forest-deep)); }
+.day-card.weekend .day-hd { background: #EEF3EA; }
+
+.dh-name {
+  font-family: 'Manrope', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.day-card.today .dh-name { color: var(--leaf-2); }
+.dh-date {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--forest-deep);
+}
+.day-card.today .dh-date { color: #fff; }
+.dh-month { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.day-card.today .dh-month { color: rgba(255,255,255,.5); }
+
+.today-pip {
+  position: absolute;
+  top: -1px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--leaf);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 0 0 8px 8px;
+}
+.weekend-pip {
+  position: absolute;
+  top: -1px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--line);
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 0 0 8px 8px;
+}
+
+/* ── CATEGORIE SECTIES ───────────────────── */
+.cat-sec { border-bottom: 1px solid var(--line); display: flex; flex-direction: column; }
+.cat-sec:last-of-type { border-bottom: none; }
+.cat-lbl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-bottom: 1.5px solid transparent;
+}
+.cat-lbl svg { width: 13px; height: 13px; flex: none; opacity: .85; }
+.cat-lbl.c-ink { color: var(--c-ink); background: #ECF2FA; border-bottom-color: #C5D8F0; }
+.cat-lbl.c-prd { color: #A85C10;      background: #FBF1E3; border-bottom-color: #ECCFA0; }
+.cat-lbl.c-trn { color: var(--c-trn); background: #E9F5EE; border-bottom-color: #B4D9C4; }
+
+/* badge op productie-label als we in BC-modus zijn */
+.demo-tag {
+  margin-left: auto;
+  background: rgba(0,0,0,.06);
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.cat-body {
+  height: var(--sec-h);
+  overflow-y: auto;
+  padding: 2px 10px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cat-body::-webkit-scrollbar { width: 3px; }
+.cat-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+.no-items {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  padding: 6px 2px 2px;
+  opacity: .7;
+}
+
+/* ── PLAN ITEMS ─────────────────────────── */
+.pi {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 6px 5px 9px;
+  border-left: 2.5px solid transparent;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+  transition: background .11s;
+  margin: 1px 0;
+}
+.pi:hover { background: rgba(0,0,0,.04); }
+.pi.ink { border-left-color: var(--c-ink); }
+.pi.prd { border-left-color: var(--c-prd); }
+.pi.s-afgehandeld { opacity: .72; }
+.pi.s-afgehandeld .pi-name { color: var(--muted); }
+.pi.trn { border-left-color: var(--c-trn); }
+.pi + .pi { border-top: 1px solid var(--line); padding-top: 6px; }
+.pi-top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.pi-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+.pi-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex: none;
+}
+.pi-badge.open         { background: var(--leaf-soft); color: var(--done); }
+.pi-badge.afgehandeld  { background: var(--amber-soft); color: var(--c-prd); }
+/* legacy */
+.pi-badge.gepland { background: var(--amber-soft); color: var(--c-prd); }
+.pi-badge.bezig   { background: #FCE8D5; color: #C04010; }
+.pi-badge.klaar   { background: var(--leaf-soft); color: var(--done); }
+.pi-meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
+/* ── NOTITIES ───────────────────────────── */
+.notes-sec { border-top: 1px solid var(--line); padding: 8px 11px 10px; flex: none; }
+.notes-lbl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.notes-lbl svg { width: 11px; height: 11px; opacity: .7; }
+.note-tile {
+  background: #F5F8F4;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--forest);
+  border-radius: 7px;
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.note-tile:hover { background: #ECF4EA; border-color: var(--leaf); }
+.note-tile-top { display: flex; align-items: center; gap: 6px; }
+.note-tile-ini {
+  background: var(--forest);
+  color: #EAF3EC;
+  font-size: 8.5px; font-weight: 700; letter-spacing: .04em;
+  padding: 1px 5px; border-radius: 5px; white-space: nowrap; flex: none;
+}
+.note-tile-ttl { font-size: 12px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.note-tile-ts { font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+.note-add-btn {
+  width: 100%; margin-top: 4px;
+  padding: 5px 0;
+  background: none; border: 1px dashed #BDC9BA;
+  border-radius: 7px;
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+}
+.note-add-btn:hover { background: #EAF3EC; color: var(--forest); border-color: var(--leaf); }
+.an-input, .an-ta {
+  width: 100%; border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-family: 'Inter', sans-serif;
+  font-size: 13px; color: var(--ink); background: #F7FAF6;
+  outline: none; transition: border-color .14s, background .14s;
+  box-sizing: border-box;
+}
+.an-input:focus, .an-ta:focus { border-color: var(--leaf); background: #fff; }
+.an-input::placeholder, .an-ta::placeholder { color: #B2BAB0; }
+.an-ta { resize: none; min-height: 90px; line-height: 1.5; }
+.an-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); display: block; margin-bottom: 5px; }
+.note-detail-body { white-space: pre-wrap; font-size: 13.5px; line-height: 1.65; color: var(--ink); }
+
+/* ── MODAL ──────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(16,32,26,.5);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface);
+  border-radius: 16px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 50px -15px rgba(0,0,0,.4);
+  overflow: hidden;
+  animation: mIn .17s ease;
+}
+@keyframes mIn {
+  from { opacity:0; transform: translateY(10px) scale(.97); }
+  to   { opacity:1; transform: none; }
+}
+.mhd { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); position: relative; }
+.m-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.m-badge.inkoop    { background: #DDEAF5; color: var(--c-ink); }
+.m-badge.productie { background: var(--amber-soft); color: var(--c-prd); }
+.m-badge.transport { background: var(--leaf-soft); color: var(--c-trn); }
+.m-badge.notitie   { background: #EEE8F5; color: #5B3A8A; }
+.m-title { font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 700; color: var(--forest-deep); line-height: 1.2; }
+.m-date  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.m-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 28px; height: 28px;
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 7px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); transition: background .12s;
+}
+.m-close:hover { background: var(--line); }
+.m-close svg { width: 13px; height: 13px; }
+.mbody { padding: 14px 20px 18px; }
+.drow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.drow:last-child { border-bottom: none; padding-bottom: 0; }
+.dlbl { color: var(--muted); font-weight: 500; min-width: 85px; flex: none; }
+.dval { font-weight: 600; color: var(--ink); text-align: right; }
+.dval b { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; color: var(--forest-deep); }
+.m-note {
+  background: var(--amber-soft);
+  border: 1px solid #E0C898;
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12px;
+  color: #7A4E1E;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.m-note strong { color: #5E3A12; }
+.mfoot { padding: 0 20px 16px; }
+.bc-open-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; padding: 9px 0;
+  background: var(--forest); color: #fff;
+  border-radius: 8px; font-size: 12.5px; font-weight: 600;
+  text-decoration: none; transition: background .14s;
+}
+.bc-open-btn:hover { background: var(--forest-deep); }
+
+/* ── TOAST ──────────────────────────────── */
+.toast {
+  position: fixed; left: 50%; bottom: 24px;
+  transform: translateX(-50%) translateY(70px);
+  background: var(--forest-deep); color: #EAF3EC;
+  padding: 10px 17px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 500;
+  box-shadow: 0 10px 26px -8px rgba(0,0,0,.45);
+  opacity: 0; transition: all .28s;
+  display: flex; align-items: center; gap: 8px; z-index: 99;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast svg { width: 15px; height: 15px; }
+
+@media (max-width:700px) {
+  .legend, .head-sub { display: none; }
+  .app-head { padding: 10px 14px 9px; }
+  .tl-wrap { padding: 12px 10px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCHERM ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="https://mivena.nl/wp-content/uploads/2025/06/Mivena_logo_vector-pixel_NW.png" alt="Mivena"
+           onerror="this.outerHTML='<span class=\'login-logo-fb\'>MIVENA</span>'">
+    </div>
+    <div class="login-title">Planbord</div>
+    <div class="login-sub">Inkoop · Productie · Transport</div>
+    <form class="login-form" onsubmit="checkLogin(event)">
+      <input class="login-input" id="loginUser" type="text" placeholder="Gebruikersnaam" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <input class="login-input" id="loginPass" type="password" placeholder="Wachtwoord" autocomplete="current-password">
+      <div class="login-error" id="loginError"></div>
+      <button class="btn-login-ms" type="submit" id="btnLogin">Inloggen</button>
+    </form>
+    <div class="login-footer">Alleen toegankelijk voor Mivena-medewerkers</div>
+  </div>
+</div>
+
+<div class="frame-note" id="frameNote">
+  <span class="pill" id="framePill">DEMO</span>
+  <span id="frameMsg">14-daagse vooruitblik · testdata, nog niet gekoppeld aan Business Central.</span>
+</div>
+
+<div class="app-head">
+  <div class="head-row">
+    <div class="brand-logo">
+      <img src="https://mivena.nl/wp-content/uploads/2025/06/Mivena_logo_vector-pixel_NW.png" alt="Mivena"
+           onerror="this.outerHTML='<span class=\'logo-fb\'>MIVENA</span>'">
+    </div>
+    <div class="head-text">
+      <div class="head-title">Planbord — Mivena Fabriek Maastricht</div>
+      <div class="head-sub">Inkoop · Productie · Transport</div>
+    </div>
+    <div class="head-right">
+      <div class="legend">
+        <div class="leg-item"><span class="leg-dot" style="background:var(--c-ink)"></span>Inkoop</div>
+        <div class="leg-item"><span class="leg-dot" style="background:var(--amber)"></span>Productie</div>
+        <div class="leg-item"><span class="leg-dot" style="background:var(--leaf)"></span>Transport</div>
+      </div>
+      <button class="btn-today" id="btnRefresh" onclick="doRefresh()" title="Data verversen" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14.93-4H16m0 0h4V4m-6.93 16A8 8 0 0 1 4.07 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Verversen
+      </button>
+      <button class="btn-bc" id="btnBC" onclick="toggleBC()">
+        Verbinden met BC
+      </button>
+      <button class="btn-today" onclick="goToToday()">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Vandaag
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="week-bar">
+  <button class="wbtn" id="btnPrev" onclick="prevWeek()">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Vorige week
+  </button>
+  <div class="week-center">
+    <div class="week-id-block">
+      <div class="week-id-top">
+        <span class="week-label-sm">Week</span>
+        <span class="week-num" id="wkNum">—</span>
+        <span class="current-badge" id="curBadge" style="display:none">Huidige week</span>
+      </div>
+      <div class="week-range" id="wkRange">—</div>
+    </div>
+    <div class="wc-divider"></div>
+    <div class="week-totals">
+      <div class="wt-item">
+        <span class="wt-dot" style="background:var(--c-ink)"></span>
+        <span>Inkoop</span>
+        <span class="wt-val" id="sInkoop">—</span>
+      </div>
+      <div class="wt-item">
+        <span class="wt-dot" style="background:var(--amber)"></span>
+        <span>Productie</span>
+        <span class="wt-val" id="sProd">—</span>
+      </div>
+      <div class="wt-item">
+        <span class="wt-dot" style="background:var(--leaf)"></span>
+        <span>Transport</span>
+        <span class="wt-val" id="sTrans">—</span>
+      </div>
+    </div>
+  </div>
+  <button class="wbtn" id="btnNext" onclick="nextWeek()">
+    Volgende week
+    <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<div class="tl-wrap">
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="mhd">
+      <div id="mBadge" class="m-badge inkoop">—</div>
+      <div id="mTitle" class="m-title">—</div>
+      <div id="mDate"  class="m-date">—</div>
+      <button class="m-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="mbody" id="mBody"></div>
+    <div class="mfoot" id="mFoot"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addNoteOverlay">
+  <div class="modal">
+    <div class="mhd">
+      <div class="m-badge notitie">Notitie</div>
+      <div class="m-title">Notitie toevoegen</div>
+      <button class="m-close" onclick="closeAddNote()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="mbody" style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label class="an-lbl">Titel</label>
+        <input id="anTitle" class="an-input" placeholder="" maxlength="80"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('anBody').focus();}">
+      </div>
+      <div>
+        <label class="an-lbl">Omschrijving</label>
+        <textarea id="anBody" class="an-ta" placeholder=""
+          onkeydown="if(event.ctrlKey&&event.key==='Enter'){submitNote();}"></textarea>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Ctrl+Enter om op te slaan</div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="bc-open-btn" onclick="submitNote()">Toevoegen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#74C69D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span id="toastMsg">—</span>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   BC CONFIGURATIE
+   ══════════════════════════════════════════ */
+const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
+const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
+const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
+const BC_ENV     = 'MivenaSandbox01';
+const BC_CO_NAME = 'CRONUS NL';
+const BC_SCOPE   = 'https://api.businesscentral.dynamics.com/user_impersonation';
+const BC_API     = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/api/v2.0`;
+const BC_ODATA   = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/ODataV4`;
+
+/* ── BC-LOGIN STAAT ─────────────────────── */
+let msalApp     = null;
+let bcToken     = null;
+let bcCompanyId = null;
+let bcConnected = false;
+let liveData    = null; // { inkoop: [], productie: [], transport: [] } — null = gebruik testdata
+
+/* ══════════════════════════════════════════
+   GEBRUIKER (vanuit BC-login of fallback)
+   ══════════════════════════════════════════ */
+let BC_USER_NAAM = 'Demo Gebruiker';
+
+function getInitialen(naam) {
+  const tv = ['de','van','der','den','het','te','ten','ter','op','in'];
+  const delen = naam.trim().split(/\s+/);
+  const sig   = delen.filter(d => !tv.includes(d.toLowerCase()));
+  if (sig.length === 0) return delen[0][0].toUpperCase();
+  if (sig.length === 1) return sig[0][0].toUpperCase();
+  return (sig[0][0] + sig[sig.length - 1][0]).toUpperCase();
+}
+let BC_INITIALEN = getInitialen(BC_USER_NAAM);
+
+/* ══════════════════════════════════════════
+   TESTDATA (fallback als niet verbonden)
+   ══════════════════════════════════════════ */
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+
+const inkoop = [
+  { date:'2026-06-24', ref:'IO-2026-0441', leverancier:'Agrifirm',   artikel:'Legmeel fijn',   kg:1200, zakken:48, opmerking:'Levering vóór 12:00 — bellen bij vertraging' },
+  { date:'2026-06-24', ref:'IO-2026-0442', leverancier:'De Heus',    artikel:'Vleeskuikenmix', kg:800,  zakken:32, opmerking:'Aanleverbon en COA meesturen' },
+  { date:'2026-06-25', ref:'IO-2026-0443', leverancier:'ForFarmers', artikel:'Biggenkorrel',   kg:1600, zakken:64, opmerking:'Certificaat biologische herkomst vereist' },
+  { date:'2026-06-26', ref:'IO-2026-0444', leverancier:'Agrifirm',   artikel:'Rundveebrok',    kg:2000, zakken:80, opmerking:null },
+  { date:'2026-06-28', ref:'IO-2026-0447', leverancier:'De Heus',    artikel:'Legmeel fijn',   kg:600,  zakken:24, opmerking:'Zaterdaglevering — weegbrug bemand houden' },
+  { date:'2026-06-29', ref:'IO-2026-0448', leverancier:'De Heus',    artikel:'Legmeel fijn',   kg:1000, zakken:40, opmerking:null },
+  { date:'2026-06-29', ref:'IO-2026-0449', leverancier:'ForFarmers', artikel:'Vleeskuikenmix', kg:1400, zakken:56, opmerking:'Lossen bij silo 3 (noord)' },
+  { date:'2026-06-30', ref:'IO-2026-0450', leverancier:'Agrifirm',   artikel:'Biggenkorrel',   kg:600,  zakken:24, opmerking:null },
+  { date:'2026-07-01', ref:'IO-2026-0451', leverancier:'De Heus',    artikel:'Rundveebrok',    kg:1800, zakken:72, opmerking:'Extra monsterneming bij aankomst' },
+  { date:'2026-07-02', ref:'IO-2026-0452', leverancier:'ForFarmers', artikel:'Legmeel fijn',   kg:1200, zakken:48, opmerking:null },
+  { date:'2026-07-03', ref:'IO-2026-0455', leverancier:'Agrifirm',   artikel:'Vleeskuikenmix', kg:900,  zakken:36, opmerking:null },
+  { date:'2026-07-06', ref:'IO-2026-0458', leverancier:'De Heus',    artikel:'Biggenkorrel',   kg:1600, zakken:64, opmerking:'Nieuwe leverancierscode — controleer systeem' },
+  { date:'2026-07-07', ref:'IO-2026-0459', leverancier:'ForFarmers', artikel:'Rundveebrok',    kg:2000, zakken:80, opmerking:null },
+];
+
+const productie = [
+  { date:'2026-06-24', ref:'PO-2026-0188', batch:'BATCH-2610-A', artikel:'Legmeel fijn',   kg:1500, status:'bezig',   opmerking:'Batch loopt door tot ca. 14:00' },
+  { date:'2026-06-24', ref:'PO-2026-0189', batch:'BATCH-2610-B', artikel:'Biggenkorrel',   kg:800,  status:'gepland', opmerking:null },
+  { date:'2026-06-25', ref:'PO-2026-0190', batch:'BATCH-2611-A', artikel:'Vleeskuikenmix', kg:1200, status:'gepland', opmerking:null },
+  { date:'2026-06-25', ref:'PO-2026-0191', batch:'BATCH-2611-B', artikel:'Rundveebrok',    kg:2000, status:'gepland', opmerking:'Langere maalcyclus — 4 uur gereserveerd' },
+  { date:'2026-06-26', ref:'PO-2026-0192', batch:'BATCH-2612-A', artikel:'Legmeel fijn',   kg:1000, status:'gepland', opmerking:null },
+  { date:'2026-06-29', ref:'PO-2026-0194', batch:'BATCH-2613-A', artikel:'Biggenkorrel',   kg:1600, status:'gepland', opmerking:null },
+  { date:'2026-06-30', ref:'PO-2026-0196', batch:'BATCH-2614-A', artikel:'Vleeskuikenmix', kg:1400, status:'gepland', opmerking:null },
+  { date:'2026-06-30', ref:'PO-2026-0197', batch:'BATCH-2614-B', artikel:'Rundveebrok',    kg:900,  status:'gepland', opmerking:null },
+  { date:'2026-07-01', ref:'PO-2026-0198', batch:'BATCH-2615-A', artikel:'Legmeel fijn',   kg:1800, status:'gepland', opmerking:'Kwaliteitscontrole verplicht bij aanvang' },
+  { date:'2026-07-02', ref:'PO-2026-0200', batch:'BATCH-2616-A', artikel:'Biggenkorrel',   kg:1200, status:'gepland', opmerking:null },
+  { date:'2026-07-03', ref:'PO-2026-0202', batch:'BATCH-2617-A', artikel:'Vleeskuikenmix', kg:800,  status:'gepland', opmerking:null },
+  { date:'2026-07-06', ref:'PO-2026-0204', batch:'BATCH-2618-A', artikel:'Rundveebrok',    kg:1600, status:'gepland', opmerking:null },
+  { date:'2026-07-07', ref:'PO-2026-0206', batch:'BATCH-2619-A', artikel:'Legmeel fijn',   kg:2000, status:'gepland', opmerking:'Grote batch — extra controlerondes inplannen' },
+  { date:'2026-07-07', ref:'PO-2026-0207', batch:'BATCH-2619-B', artikel:'Vleeskuikenmix', kg:1000, status:'gepland', opmerking:null },
+];
+
+const transport = [
+  { date:'2026-06-24', ref:'TR-2026-0311', klant:'Maatschap Bakker',     artikel:'Legmeel fijn',   kg:1500, pallets:3, chauffeur:'R. van Dijk', vertrek:'07:30' },
+  { date:'2026-06-25', ref:'TR-2026-0312', klant:'Veehouderij De Haan',  artikel:'Biggenkorrel',   kg:800,  pallets:2, chauffeur:'J. Peters',   vertrek:'08:00' },
+  { date:'2026-06-25', ref:'TR-2026-0313', klant:'LTO-coöperatie Noord', artikel:'Rundveebrok',    kg:2000, pallets:4, chauffeur:'R. van Dijk', vertrek:'13:00' },
+  { date:'2026-06-26', ref:'TR-2026-0314', klant:'Maatschap Bakker',     artikel:'Vleeskuikenmix', kg:1200, pallets:3, chauffeur:'J. Peters',   vertrek:'07:30' },
+  { date:'2026-06-28', ref:'TR-2026-0317', klant:'LTO-coöperatie Noord', artikel:'Rundveebrok',    kg:800,  pallets:2, chauffeur:'R. van Dijk', vertrek:'09:00' },
+  { date:'2026-06-29', ref:'TR-2026-0318', klant:'Veehouderij De Haan',  artikel:'Legmeel fijn',   kg:1000, pallets:2, chauffeur:'R. van Dijk', vertrek:'09:00' },
+  { date:'2026-06-30', ref:'TR-2026-0320', klant:'LTO-coöperatie Noord', artikel:'Biggenkorrel',   kg:1600, pallets:4, chauffeur:'J. Peters',   vertrek:'08:30' },
+  { date:'2026-06-30', ref:'TR-2026-0321', klant:'Maatschap Bakker',     artikel:'Rundveebrok',    kg:900,  pallets:2, chauffeur:'R. van Dijk', vertrek:'13:30' },
+  { date:'2026-07-01', ref:'TR-2026-0322', klant:'Veehouderij De Haan',  artikel:'Vleeskuikenmix', kg:1400, pallets:3, chauffeur:'J. Peters',   vertrek:'08:00' },
+  { date:'2026-07-02', ref:'TR-2026-0324', klant:'LTO-coöperatie Noord', artikel:'Legmeel fijn',   kg:1800, pallets:4, chauffeur:'R. van Dijk', vertrek:'07:30' },
+  { date:'2026-07-03', ref:'TR-2026-0326', klant:'Maatschap Bakker',     artikel:'Biggenkorrel',   kg:1200, pallets:3, chauffeur:'J. Peters',   vertrek:'09:00' },
+  { date:'2026-07-03', ref:'TR-2026-0327', klant:'Veehouderij De Haan',  artikel:'Rundveebrok',    kg:800,  pallets:2, chauffeur:'R. van Dijk', vertrek:'14:00' },
+  { date:'2026-07-06', ref:'TR-2026-0330', klant:'LTO-coöperatie Noord', artikel:'Vleeskuikenmix', kg:1600, pallets:4, chauffeur:'J. Peters',   vertrek:'08:00' },
+  { date:'2026-07-07', ref:'TR-2026-0332', klant:'Maatschap Bakker',     artikel:'Legmeel fijn',   kg:2000, pallets:5, chauffeur:'R. van Dijk', vertrek:'07:00' },
+  { date:'2026-07-07', ref:'TR-2026-0333', klant:'Veehouderij De Haan',  artikel:'Biggenkorrel',   kg:1200, pallets:3, chauffeur:'J. Peters',   vertrek:'10:30' },
+];
+
+/* ══════════════════════════════════════════
+   NOTITIES
+   ══════════════════════════════════════════ */
+const notes = {};
+
+/* ══════════════════════════════════════════
+   WEEKEND STAAT
+   ══════════════════════════════════════════ */
+let weekendOpen = localStorage.getItem('mivena-weekend') === 'true';
+function toggleWeekend() {
+  weekendOpen = !weekendOpen;
+  localStorage.setItem('mivena-weekend', String(weekendOpen));
+  render();
+  showToast(weekendOpen ? 'Weekend zichtbaar' : 'Weekend verborgen');
+}
+
+/* ══════════════════════════════════════════
+   ITEM STORE (modal lookups)
+   ══════════════════════════════════════════ */
+const store = [];
+function push(obj) { const i = store.length; store.push(obj); return i; }
+
+/* ══════════════════════════════════════════
+   HELPERS
+   ══════════════════════════════════════════ */
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function isWeekend(d)  { const w = d.getDay(); return w === 0 || w === 6; }
+function iso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getMonday(d) {
+  const r = new Date(d);
+  const day = r.getDay();
+  r.setDate(r.getDate() - (day === 0 ? 6 : day - 1));
+  return r;
+}
+function isoWeek(d) {
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dow  = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dow);
+  const y1  = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  return Math.ceil((((tmp - y1) / 86400000) + 1) / 7);
+}
+
+const DAGEN   = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+const DAGEN_L = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
+const MAANDEN = ['januari','februari','maart','april','mei','juni',
+                 'juli','augustus','september','oktober','november','december'];
+
+function fKg(n) { return (n || 0).toLocaleString('nl-NL') + ' kg'; }
+function forDay(arr, ds) { return arr.filter(x => x.date === ds); }
+function nowStamp() {
+  const n = new Date();
+  return `${DAGEN_L[n.getDay()]} ${n.getDate()} ${MAANDEN[n.getMonth()]} · ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ══════════════════════════════════════════
+   NAVIGATIE STAAT
+   ══════════════════════════════════════════ */
+const WEEK0 = getMonday(TODAY);
+let page = 0; // 0 = huidige week, negatief = verleden, positief = toekomst
+const MAX_FUTURE = 4;
+const MAX_PAST   = 12; // maximaal 12 weken terug
+function weekDays(p) {
+  return Array.from({length:7}, (_, i) => addDays(WEEK0, p * 7 + i));
+}
+
+/* ══════════════════════════════════════════
+   SVG ICONEN
+   ══════════════════════════════════════════ */
+const SVG_INKOOP = `<svg viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const SVG_PROD   = `<svg viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_TRANS  = `<svg viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" rx="1" stroke="currentColor" stroke-width="2"/><path d="M16 8h4l3 3v5h-7V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.5" cy="18.5" r="2.5" stroke="currentColor" stroke-width="2"/><circle cx="18.5" cy="18.5" r="2.5" stroke="currentColor" stroke-width="2"/></svg>`;
+const SVG_PEN    = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_CHEV_R = `<svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_CHEV_L = `<svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/* ══════════════════════════════════════════
+   MSAL — BUSINESS CENTRAL KOPPELING
+   ══════════════════════════════════════════ */
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+}
+function showLoginScreen() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+/* ── LOGIN CREDENTIALS (pas hier aan naar wens) ── */
+const LOGIN_GEBRUIKER = 'mivena';
+const LOGIN_WACHTWOORD = 'Planbord2026';
+
+function checkLogin(e) {
+  e.preventDefault();
+  const user = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginError');
+  if (user === LOGIN_GEBRUIKER && pass === LOGIN_WACHTWOORD) {
+    sessionStorage.setItem('planbord_auth', '1');
+    err.textContent = '';
+    // Toon laadmelding en start BC-koppeling automatisch
+    document.getElementById('btnLogin').textContent = 'Verbinden met Business Central…';
+    document.getElementById('btnLogin').disabled = true;
+    initMsal(true); // true = automatisch inloggen als nog geen sessie
+  } else {
+    err.textContent = 'Onjuiste gebruikersnaam of wachtwoord';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginPass').focus();
+  }
+}
+
+async function initMsal(autoLogin = false) {
+  try {
+    msalApp = new msal.PublicClientApplication({
+      auth: {
+        clientId:    BC_CLIENT,
+        authority:   `https://login.microsoftonline.com/${BC_TENANT}`,
+        redirectUri: BC_REDIR
+      },
+      cache: { cacheLocation: 'sessionStorage' }
+    });
+    await msalApp.initialize();
+    // Verwerk redirect-terugkeer na Microsoft-login
+    const redirectResult = await msalApp.handleRedirectPromise().catch(() => null);
+    if (redirectResult) {
+      showApp();
+      await onLoginSuccess(redirectResult);
+      return;
+    }
+    // Check stille herverbinding (sessie nog actief)
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      const result = await msalApp.acquireTokenSilent({
+        scopes: [BC_SCOPE],
+        account: accounts[0]
+      }).catch(() => null);
+      if (result) {
+        await onLoginSuccess(result);
+        return;
+      }
+    }
+    // Geen actieve BC-sessie: als autoLogin, stuur door naar Microsoft
+    if (autoLogin) {
+      await msalApp.loginRedirect({ scopes: [BC_SCOPE] });
+      return;
+    }
+  } catch(e) {
+    console.warn('MSAL init failed:', e);
+  }
+  updateBCButton();
+}
+
+async function toggleBC() {
+  if (bcConnected) {
+    // Uitloggen — cache wissen en terugsturen naar loginscherm
+    bcConnected = false; bcToken = null; bcCompanyId = null; liveData = null;
+    if (msalApp) msalApp.clearCache();
+    sessionStorage.removeItem('planbord_auth');
+    updateBCButton();
+    render();
+    showLoginScreen();
+  } else {
+    // Verbinden via popup
+    if (!msalApp) { showToast('Pagina herladen en opnieuw proberen'); return; }
+    updateBCButton('bezig');
+    try {
+      await msalApp.loginRedirect({ scopes: [BC_SCOPE] });
+    } catch(e) {
+      if (e.errorCode !== 'user_cancelled') {
+        showToast('Inloggen mislukt — ' + (e.errorMessage || e.message || 'Onbekende fout'));
+      }
+      updateBCButton();
+    }
+  }
+}
+
+async function onLoginSuccess(result) {
+  showApp(); // verberg loginscherm, toon planbord
+  bcToken = result.accessToken;
+
+  // Initialen bijwerken voor de BC-knop
+  if (result.account?.name) {
+    BC_USER_NAAM = result.account.name;
+    BC_INITIALEN = getInitialen(BC_USER_NAAM);
+  }
+
+  // Bedrijf opzoeken
+  updateBCButton('bezig');
+  const cmpData = await bcGet('/companies');
+  const company = (cmpData.value || []).find(c => c.name === BC_CO_NAME) || (cmpData.value || [])[0];
+  if (!company) throw new Error('Bedrijf "' + BC_CO_NAME + '" niet gevonden in BC');
+  bcCompanyId = company.id;
+  bcConnected  = true;
+
+  showToast('Verbonden met ' + company.name);
+  await refreshBCData();
+}
+
+/* ── BC API FETCH ───────────────────────── */
+async function bcGet(path) {
+  const url = path.startsWith('http') ? path : BC_API + path;
+  const r = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${bcToken}` }
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`BC ${r.status}: ${t.substring(0, 200)}`);
+  }
+  return r.json();
+}
+
+async function bcPatch(path, body, etag) {
+  const url = path.startsWith('http') ? path : BC_API + path;
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization':  `Bearer ${bcToken}`,
+      'Content-Type':   'application/json',
+      'If-Match':       etag || '*'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`BC PATCH ${r.status}: ${t.substring(0, 200)}`);
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+/* ── DATA OPHALEN UIT BC ────────────────── */
+async function doRefresh() {
+  if (!bcConnected) return;
+  const btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  btn.style.opacity = '.55';
+  await refreshBCData();
+  btn.disabled = false;
+  btn.style.opacity = '';
+  showToast('Data ververst');
+}
+
+async function refreshBCData() {
+  if (!bcConnected || !bcCompanyId) return;
+  const days = weekDays(page);
+  const sd = iso(days[0]), ed = iso(days[6]);
+  updateBCButton('bezig');
+  const coName = encodeURIComponent(BC_CO_NAME);
+  try {
+    const [poRes, soRes, aoRes, prRes, ssRes] = await Promise.all([
+      bcGet(`${BC_ODATA}/Company('${coName}')/PurchaseOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`).catch(() => null),
+      bcGet(`${BC_ODATA}/Company('${coName}')/SalesOrders?$filter=Promised_Delivery_Date ge ${sd} and Promised_Delivery_Date le ${ed}`),
+      bcGet(`${BC_ODATA}/Company('${coName}')/AssemblyOrders?$filter=Starting_Date ge ${sd} and Starting_Date le ${ed}`),
+      bcGet(`/companies(${bcCompanyId})/purchaseReceipts?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=purchaseReceiptLines`).catch(() => ({value:[]})),
+      bcGet(`/companies(${bcCompanyId})/salesShipments?$filter=postingDate ge ${sd} and postingDate le ${ed}&$expand=salesShipmentLines`).catch(() => ({value:[]}))
+    ]);
+    liveData = {
+      inkoop:    [...transformPO(poRes), ...transformPR(prRes)],
+      productie: transformAO(aoRes),
+      transport: [...transformSO(soRes), ...transformSS(ssRes)]
+    };
+    render();
+    updateBCButton('ok');
+  } catch(e) {
+    console.error('BC data fetch:', e);
+    showToast('Datafout: ' + e.message);
+    updateBCButton('fout');
+    liveData = null;
+    render();
+  }
+}
+
+function fInitialen(ini) {
+  if (!ini) return '';
+  return ini.split('').join('.') + '.'; // "FH" → "F.H."
+}
+
+function bcDeepLink(type, item) {
+  const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/ui`;
+  const co   = encodeURIComponent(BC_CO_NAME);
+  const ref  = encodeURIComponent((item._no || item.ref || '').replace(/['"]/g, ''));
+  const page = type === 'inkoop' ? 50 : type === 'productie' ? 900 : 42;
+  return `${base}?company=${co}&page=${page}&filter='No'%20IS%20'${ref}'`;
+}
+
+function fDateNL(str) {
+  if (!str || str === '0001-01-01') return '—';
+  const d = (str || '').substring(0, 10);
+  if (!d) return '—';
+  const [y, m, dd] = d.split('-');
+  return `${dd}-${m}-${y}`;
+}
+
+function transformPO(res) {
+  // OData web service (page 50): veldnamen zijn PascalCase met underscores
+  if (!res) return [];
+  const out = [];
+  (res.value || []).forEach(po => {
+    const datum = (po.Due_Date || '').substring(0, 10);
+    if (!datum || datum === '0001-01-01') return;
+    out.push({
+      date:          datum,
+      ref:           po.No || '—',
+      leverancier:   po.Buy_from_Vendor_Name || po.Buy_from_Vendor_No || '—',
+      leverancierNr: po.Buy_from_Vendor_No || '',
+      orderDatum:    (po.Order_Date || '').substring(0, 10),
+      artikel:       po.Description || '—',
+      eenheid:       '',
+      kg:            po.Quantity || 0,
+      zakken:        Math.round((po.Quantity || 0) / 25),
+      prijs:         0,
+      status:        'open',
+      opmerking:     null,
+      _no:           po.No || '',
+      _etag:         po['@odata.etag'] || '*'
+    });
+  });
+  return out;
+}
+
+function transformPR(res) {
+  const out = [];
+  (res.value || []).forEach(pr => {
+    const lines = pr.purchaseReceiptLines?.value || [];
+    lines.forEach(line => {
+      if (line.lineType !== 'Item' && line.lineType !== 'item') return;
+      out.push({
+        date:        (pr.postingDate || '').substring(0, 10),
+        ref:         pr.number,
+        leverancier: pr.vendorName,
+        artikel:     line.description,
+        kg:          line.quantity || 0,
+        zakken:      Math.round((line.quantity || 0) / 25),
+        status:      'afgehandeld',
+        opmerking:   null,
+        _id:         null // geboekt, niet meer te wijzigen
+      });
+    });
+  });
+  return out;
+}
+
+function transformSO(res) {
+  // Resultaat van OData webservice (page 42 SalesOrders)
+  // Veldnamen zijn anders dan REST API: No ipv number, Sell_to_Customer_Name ipv customerName etc.
+  const out = [];
+  (res.value || []).forEach(so => {
+    const no   = so.No || so.number || '—';
+    const klant = so.Sell_to_Customer_Name || so.customerName || '—';
+    const datum = (so.Promised_Delivery_Date || so.requestedDeliveryDate || '').substring(0, 10);
+    if (!datum) return; // geen datum → niet tonen
+    out.push({
+      date:         datum,
+      ref:          no,
+      status:       'open',
+      klant:        klant,
+      orderDatum:   (so.Order_Date || '').substring(0, 10),
+      verzoekDatum: (so.Requested_Delivery_Date || '').substring(0, 10),
+      adres:        so.Sell_to_Address || '',
+      stad:         so.Sell_to_City || '',
+      telefoon:     so.Sell_to_Phone_No || so.Sell_to_Phone || '',
+      contact:      so.Contact || '',
+      status_bc:    so.Status || '',
+      _id:          so.SystemId || so.id || null,
+      _etag:        so['@odata.etag'] || '*'
+    });
+  });
+  return out;
+}
+
+function transformSS(res) {
+  const out = [];
+  (res.value || []).forEach(ss => {
+    const lines = ss.salesShipmentLines?.value || [];
+    lines.forEach(line => {
+      if (line.lineType !== 'Item' && line.lineType !== 'item') return;
+      out.push({
+        date:      (ss.postingDate || '').substring(0, 10),
+        ref:       ss.number,
+        status:    'afgehandeld',
+        klant:     ss.customerName,
+        artikel:   line.description,
+        kg:        line.quantity || 0,
+        pallets:   Math.max(1, Math.ceil((line.quantity || 0) / 500)),
+        chauffeur: '—',
+        vertrek:   '—',
+        _id:       null
+      });
+    });
+  });
+  return out;
+}
+
+function transformAO(res) {
+  const statusMap = {
+    0: 'open',         'Open': 'open',
+    1: 'open',         'Released': 'open',
+    2: 'open',         'In Assembly': 'open',
+    3: 'afgehandeld',  'Assembled': 'afgehandeld'
+  };
+  const out = [];
+  (res.value || []).forEach(ao => {
+    const no = ao.No || ao.No_ || '';
+    out.push({
+      date:      (ao.Starting_Date || '').substring(0, 10),
+      dueDate:   (ao.Due_Date || '').substring(0, 10),
+      ref:       no || '—',
+      batch:     no || '—',
+      itemNo:    ao.Item_No || '',
+      artikel:   ao.Description || ao.Item_No || '—',
+      kg:        ao.Quantity || 0,
+      locatie:   ao.Location_Code || '',
+      status:    statusMap[ao.Status] || 'gepland',
+      opmerking: null,
+      _no:       no,
+      _etag:     ao['@odata.etag'] || '*'
+    });
+  });
+  return out;
+}
+
+/* ── BC KNOP STATUS ─────────────────────── */
+function updateBCButton(staat) {
+  const btn = document.getElementById('btnBC');
+  const fn  = document.getElementById('frameNote');
+  const fp  = document.getElementById('framePill');
+  const fm  = document.getElementById('frameMsg');
+
+  if (staat === 'bezig') {
+    btn.innerHTML = `<span class="bc-dot busy"></span> Bezig…`;
+    btn.classList.remove('connected');
+    return;
+  }
+  if (staat === 'fout') {
+    btn.innerHTML = `<span class="bc-dot err"></span> Fout — Opnieuw`;
+    btn.classList.remove('connected');
+    return;
+  }
+  if (bcConnected) {
+    btn.innerHTML = `<span class="bc-dot ok"></span> ${BC_INITIALEN} · BC verbonden`;
+    btn.classList.add('connected');
+    fn.style.cssText = 'background:#EAF5EE;border-bottom-color:#B4D9C4;color:#1A5E35';
+    fp.style.background = '#2D7A4F';
+    fp.textContent = 'LIVE';
+    fm.textContent = `Verbonden met Business Central · ${BC_CO_NAME}`;
+    document.getElementById('btnRefresh').style.display = '';
+  } else {
+    btn.innerHTML = `Verbinden met BC`;
+    btn.classList.remove('connected');
+    fn.style.cssText = '';
+    fp.style.background = '';
+    fp.textContent = 'DEMO';
+    fm.textContent = '14-daagse vooruitblik · testdata, nog niet gekoppeld aan Business Central.';
+    document.getElementById('btnRefresh').style.display = 'none';
+  }
+}
+
+/* ══════════════════════════════════════════
+   RENDER
+   ══════════════════════════════════════════ */
+function render() {
+  store.length = 0;
+  const days  = weekDays(page);
+  const first = days[0], last = days[6];
+  const wn    = isoWeek(first);
+
+  const sameMonth = first.getMonth() === last.getMonth();
+  const range = sameMonth
+    ? `${first.getDate()} t/m ${last.getDate()} ${MAANDEN[last.getMonth()]} ${last.getFullYear()}`
+    : `${first.getDate()} ${MAANDEN[first.getMonth()]} t/m ${last.getDate()} ${MAANDEN[last.getMonth()]} ${last.getFullYear()}`;
+  document.getElementById('wkNum').textContent   = wn;
+  document.getElementById('wkRange').textContent = range;
+  document.getElementById('curBadge').style.display = page === 0 ? 'inline-flex' : 'none';
+  document.getElementById('btnPrev').disabled = page <= -MAX_PAST;
+  document.getElementById('btnNext').disabled = page >= MAX_FUTURE;
+
+  // Databron bepalen
+  const srcInkoop    = liveData?.inkoop    ?? inkoop;
+  const srcTransport = liveData?.transport ?? transport;
+  const srcProductie = liveData?.productie ?? productie;
+
+  const allDs  = days.map(iso);
+  const wInk   = srcInkoop.filter(x => allDs.includes(x.date));
+  const wPrd   = srcProductie.filter(x => allDs.includes(x.date));
+  const wTrn   = srcTransport.filter(x => allDs.includes(x.date));
+  const inkKg  = wInk.reduce((a,x) => a + (x.kg||0), 0);
+  const prdKg  = wPrd.reduce((a,x) => a + (x.kg||0), 0);
+  const tp     = wTrn.reduce((a,x) => a + (x.pallets||0), 0);
+
+  document.getElementById('sInkoop').textContent =
+    `${(inkKg/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wInk.length} lev.`;
+  document.getElementById('sProd').textContent =
+    `${(prdKg/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wPrd.length} bat.`;
+  document.getElementById('sTrans').textContent =
+    `${tp} plt · ${wTrn.length} rit.`;
+
+  const tl = document.getElementById('timeline');
+  tl.style.gridTemplateColumns = weekendOpen
+    ? 'repeat(7, minmax(155px, 1fr)) 52px'
+    : 'repeat(5, minmax(155px, 1fr)) 52px';
+  tl.style.minWidth = weekendOpen ? '1210px' : '850px';
+
+  const todayStr = iso(TODAY);
+  const wkdDays  = days.slice(0, 5);
+  const wkeDays  = days.slice(5);
+  let html = '';
+
+  wkdDays.forEach(d => { html += dayColumn(d, todayStr, srcInkoop, srcProductie, srcTransport); });
+
+  if (!weekendOpen) {
+    html += `<div class="wknd-closed" onclick="toggleWeekend()" title="Zaterdag en zondag tonen">
+      <span class="wknd-closed-icon">${SVG_CHEV_R}</span>
+      <span class="wknd-closed-lbl">Za + Zo</span>
+    </div>`;
+  } else {
+    html += dayColumn(wkeDays[0], todayStr, srcInkoop, srcProductie, srcTransport);
+    html += dayColumn(wkeDays[1], todayStr, srcInkoop, srcProductie, srcTransport);
+    html += `<div class="wknd-closed" onclick="toggleWeekend()" title="Weekend verbergen">
+      <span class="wknd-closed-icon">${SVG_CHEV_L}</span>
+      <span class="wknd-closed-lbl">Za + Zo</span>
+    </div>`;
+  }
+  tl.innerHTML = html;
+}
+
+/* ── DAG KOLOM ──────────────────────────── */
+function dayColumn(date, todayStr, srcInk, srcPrd, srcTrn) {
+  const dayStr  = iso(date);
+  const isToday = dayStr === todayStr;
+  const weekend = isWeekend(date);
+
+  const inkItems = forDay(srcInk, dayStr);
+  const prdItems = forDay(srcPrd, dayStr);
+  const trnItems = forDay(srcTrn, dayStr);
+
+  const inkRows = inkItems.length
+    ? inkItems.map(item => {
+        const i   = push({type:'inkoop', item, date});
+        const afg = item.status === 'afgehandeld';
+        const drg = `draggable="true" ondragstart="onTileDrag(event,${i})" ondragend="onTileDragEnd(event)"`;
+        const badge = afg ? `<span class="pi-badge afgehandeld">Afgehandeld</span>` : '';
+        return `<div class="pi ink s-${item.status||'open'}" ${drg} onclick="showDetail(${i})">
+          <div class="pi-top"><span class="pi-name">${escHtml(item.artikel||'—')}</span>${badge}</div>
+          <div class="pi-meta">${escHtml(item.leverancier||'—')} · ${fKg(item.kg)}</div>
+        </div>`;
+      }).join('')
+    : `<div class="no-items">${bcConnected ? 'Geen orders in BC' : 'Geen aanvoer'}</div>`;
+
+  const prdRows = prdItems.length
+    ? prdItems.map(item => {
+        const i   = push({type:'productie', item, date});
+        const afg2 = item.status === 'afgehandeld';
+        const lbl  = afg2 ? 'Afgehandeld' : 'Open';
+        const drg  = `draggable="true" ondragstart="onTileDrag(event,${i})" ondragend="onTileDragEnd(event)"`;
+
+        return `<div class="pi prd s-${item.status||'open'}" ${drg} onclick="showDetail(${i})">
+          <div class="pi-top">
+            <span class="pi-name">${escHtml(item.artikel||'—')}</span>
+            <span class="pi-badge ${item.status||'open'}">${lbl}</span>
+          </div>
+          <div class="pi-meta">${escHtml(item.batch||item.ref||'—')} · ${fKg(item.kg)}</div>
+        </div>`;
+      }).join('')
+    : `<div class="no-items">${liveData?.productie ? 'Geen orders in BC' : 'Geen productie'}</div>`;
+
+  const trnRows = trnItems.length
+    ? trnItems.map(item => {
+        const i   = push({type:'transport', item, date});
+        const afg3  = item.status === 'afgehandeld';
+        const drg3  = `draggable="true" ondragstart="onTileDrag(event,${i})" ondragend="onTileDragEnd(event)"`;
+        const badge3 = afg3 ? `<span class="pi-badge afgehandeld">Afgehandeld</span>` : '';
+        return `<div class="pi trn s-${item.status||'open'}" ${drg3} onclick="showDetail(${i})">
+          <div class="pi-top"><span class="pi-name">${escHtml(item.klant||'—')}</span>${badge3}</div>
+          ${item.ref && item.ref !== '—' ? `<div class="pi-meta">${escHtml(item.ref)}</div>` : ''}
+        </div>`;
+      }).join('')
+    : `<div class="no-items">${bcConnected ? 'Geen orders in BC' : 'Geen transport'}</div>`;
+
+  const dayNotes = notes[dayStr] || [];
+  const noteTiles = dayNotes.map((n, idx) => `
+    <div class="note-tile" onclick="showNoteDetail('${dayStr}',${idx})">
+      <div class="note-tile-top">
+        <span class="note-tile-ini">${escHtml(fInitialen(n.initialen))}</span>
+        <span class="note-tile-ttl">${escHtml(n.title)}</span>
+      </div>
+      <div class="note-tile-ts">${n.savedAt}</div>
+    </div>`).join('');
+
+  // Productie-demotag alleen als BC verbonden maar productie nog testdata is
+  const prdDemoTag = (bcConnected && !liveData?.productie) ? `<span class="demo-tag">testdata</span>` : '';
+
+  return `
+    <div class="day-card${isToday?' today':''}${weekend?' weekend':''}">
+      <div class="day-hd">
+        ${isToday  ? '<span class="today-pip">Vandaag</span>' : ''}
+        ${weekend && !isToday ? '<span class="weekend-pip">Weekend</span>' : ''}
+        <div class="dh-name">${DAGEN[date.getDay()]}</div>
+        <div class="dh-date">${date.getDate()}</div>
+        <div class="dh-month">${MAANDEN[date.getMonth()]}</div>
+      </div>
+      <div class="cat-sec">
+        <div class="cat-lbl c-ink">${SVG_INKOOP}Inkoop</div>
+        <div class="cat-body" ondragover="onCatDragOver(event,'${dayStr}','inkoop')" ondragleave="onCatDragLeave(event)" ondrop="onCatDrop(event,'${dayStr}','inkoop')">${inkRows}</div>
+      </div>
+      <div class="cat-sec">
+        <div class="cat-lbl c-prd">${SVG_PROD}Productie${prdDemoTag}</div>
+        <div class="cat-body" ondragover="onCatDragOver(event,'${dayStr}','productie')" ondragleave="onCatDragLeave(event)" ondrop="onCatDrop(event,'${dayStr}','productie')">${prdRows}</div>
+      </div>
+      <div class="cat-sec">
+        <div class="cat-lbl c-trn">${SVG_TRANS}Transport</div>
+        <div class="cat-body" ondragover="onCatDragOver(event,'${dayStr}','transport')" ondragleave="onCatDragLeave(event)" ondrop="onCatDrop(event,'${dayStr}','transport')">${trnRows}</div>
+      </div>
+      <div class="notes-sec">
+        <div class="notes-lbl">${SVG_PEN}Notitie</div>
+        ${noteTiles}
+        <button class="note-add-btn" onclick="openAddNote('${dayStr}')">+ Voeg notitie toe</button>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   NOTITIES
+   ══════════════════════════════════════════ */
+let addNoteDay = null;
+
+function openAddNote(dayStr) {
+  addNoteDay = dayStr;
+  document.getElementById('anTitle').value = '';
+  document.getElementById('anBody').value  = '';
+  document.getElementById('addNoteOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('anTitle').focus(), 60);
+}
+function closeAddNote() {
+  document.getElementById('addNoteOverlay').classList.remove('show');
+  addNoteDay = null;
+}
+function submitNote() {
+  if (!addNoteDay) return;
+  const title = document.getElementById('anTitle').value.trim();
+  const body  = document.getElementById('anBody').value.trim();
+  if (!title) { document.getElementById('anTitle').focus(); return; }
+  if (!notes[addNoteDay]) notes[addNoteDay] = [];
+  notes[addNoteDay].push({
+    id:        Date.now(),
+    title,
+    body,
+    initialen: BC_INITIALEN || '?',
+    naam:      BC_USER_NAAM || '',
+    savedAt:   nowStamp()
+  });
+  closeAddNote();
+  render();
+}
+function showNoteDetail(dayStr, idx) {
+  const n = (notes[dayStr] || [])[idx];
+  if (!n) return;
+  const badge = document.getElementById('mBadge');
+  badge.className = 'm-badge notitie';
+  badge.textContent = 'Notitie';
+  document.getElementById('mTitle').textContent = n.title;
+  document.getElementById('mDate').textContent  = `${fInitialen(n.initialen)}${n.naam ? ' · ' + n.naam : ''} · ${n.savedAt}`;
+  document.getElementById('mBody').innerHTML = n.body
+    ? `<div class="note-detail-body">${escHtml(n.body)}</div>`
+    : `<div style="color:var(--muted);font-size:13px;font-style:italic">Geen omschrijving.</div>`;
+  document.getElementById('mFoot').innerHTML =
+    `<button class="bc-open-btn" style="background:#B03A2E"
+       onclick="deleteNote('${dayStr}',${idx});closeModal()">
+       Notitie verwijderen
+     </button>`;
+  document.getElementById('modal').classList.add('show');
+}
+function deleteNote(dayStr, idx) {
+  if (notes[dayStr]) {
+    notes[dayStr].splice(idx, 1);
+    if (notes[dayStr].length === 0) delete notes[dayStr];
+  }
+  render();
+}
+document.getElementById('addNoteOverlay').addEventListener('click', e => {
+  if (e.target.id === 'addNoteOverlay') closeAddNote();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeAddNote(); }
+});
+
+/* ══════════════════════════════════════════
+   NAVIGATIE
+   ══════════════════════════════════════════ */
+function prevWeek() {
+  if (page > -MAX_PAST) { page--; render(); refreshBCData(); }
+}
+function nextWeek() {
+  if (page < MAX_FUTURE) { page++; render(); refreshBCData(); }
+}
+function goToToday() {
+  page = 0; render(); refreshBCData(); showToast('Terug naar deze week');
+}
+
+/* ══════════════════════════════════════════
+   MODAL
+   ══════════════════════════════════════════ */
+function showDetail(idx) {
+  const {type, item, date} = store[idx];
+  const dl = `${DAGEN_L[date.getDay()]} ${date.getDate()} ${MAANDEN[date.getMonth()]} ${date.getFullYear()}`;
+  const badge = document.getElementById('mBadge');
+  badge.className = 'm-badge ' + type;
+  badge.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+  document.getElementById('mTitle').textContent =
+    type === 'transport' ? (item.klant || '—') : (item.artikel || '—');
+  document.getElementById('mDate').textContent  = dl;
+
+  let rows = '';
+  if (type === 'inkoop') {
+    rows = `
+      <div class="drow"><span class="dlbl">Ordernummer</span><span class="dval">${item.ref}</span></div>
+      <div class="drow"><span class="dlbl">Leverancier</span><span class="dval">${item.leverancier}${item.leverancierNr ? ` <small style="opacity:.5">(${item.leverancierNr})</small>` : ''}</span></div>
+      <div class="drow"><span class="dlbl">Artikel</span><span class="dval">${item.artikel}</span></div>
+      <div class="drow"><span class="dlbl">Hoeveelheid</span><span class="dval"><b>${fKg(item.kg)}</b>${item.eenheid ? ` <small style="opacity:.6">${item.eenheid}</small>` : ''}</span></div>
+      <div class="drow"><span class="dlbl">Verpakking</span><span class="dval">${item.zakken} zakken</span></div>
+      ${item.orderDatum ? `<div class="drow"><span class="dlbl">Besteldatum</span><span class="dval">${fDateNL(item.orderDatum)}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval">${fDateNL(item.date)}</span></div>
+      ${item.prijs ? `<div class="drow"><span class="dlbl">Prijs p/e</span><span class="dval">€&nbsp;${item.prijs.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>` : ''}
+      ${item.opmerking ? `<div class="m-note"><strong>Opmerking</strong><br>${item.opmerking}</div>` : ''}`;
+  } else if (type === 'productie') {
+    const lbl = {open:'Open',afgehandeld:'Afgehandeld'}[item.status] || item.status;
+    rows = `
+      <div class="drow"><span class="dlbl">Ordernummer</span><span class="dval">${item.ref}</span></div>
+      ${item.itemNo ? `<div class="drow"><span class="dlbl">Artikelnummer</span><span class="dval">${item.itemNo}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Omschrijving</span><span class="dval">${item.artikel}</span></div>
+      <div class="drow"><span class="dlbl">Hoeveelheid</span><span class="dval"><b>${fKg(item.kg)}</b></span></div>
+      <div class="drow"><span class="dlbl">Startdatum</span><span class="dval">${fDateNL(item.date)}</span></div>
+      ${item.dueDate && item.dueDate !== '0001-01-01' ? `<div class="drow"><span class="dlbl">Vervaldatum</span><span class="dval">${fDateNL(item.dueDate)}</span></div>` : ''}
+      ${item.locatie ? `<div class="drow"><span class="dlbl">Locatie</span><span class="dval">${item.locatie}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Status</span><span class="dval"><span class="pi-badge ${item.status}" style="font-size:11px;padding:2px 9px">${lbl}</span></span></div>
+      ${item.opmerking ? `<div class="m-note"><strong>Opmerking</strong><br>${item.opmerking}</div>` : ''}`;
+  } else {
+    const adresLijst = [item.adres, item.stad].filter(Boolean).join(', ');
+    rows = `
+      <div class="drow"><span class="dlbl">Ordernummer</span><span class="dval">${item.ref||'—'}</span></div>
+      <div class="drow"><span class="dlbl">Klant</span><span class="dval">${item.klant||'—'}</span></div>
+      ${adresLijst ? `<div class="drow"><span class="dlbl">Afleveradres</span><span class="dval">${adresLijst}</span></div>` : ''}
+      ${item.contact ? `<div class="drow"><span class="dlbl">Contactpersoon</span><span class="dval">${item.contact}</span></div>` : ''}
+      ${item.telefoon ? `<div class="drow"><span class="dlbl">Telefoon</span><span class="dval">${item.telefoon}</span></div>` : ''}
+      ${item.orderDatum ? `<div class="drow"><span class="dlbl">Orderdatum</span><span class="dval">${fDateNL(item.orderDatum)}</span></div>` : ''}
+      ${item.verzoekDatum ? `<div class="drow"><span class="dlbl">Verzochte leverdatum</span><span class="dval">${fDateNL(item.verzoekDatum)}</span></div>` : ''}
+      <div class="drow"><span class="dlbl">Toegezegde leverdatum</span><span class="dval"><b>${fDateNL(item.date)}</b></span></div>`;
+  }
+  document.getElementById('mBody').innerHTML = rows;
+
+  // BC deeplink knop
+  const foot = document.getElementById('mFoot');
+  const canLink = bcConnected && item.ref && item.ref !== '—';
+  foot.innerHTML = canLink
+    ? `<a href="${bcDeepLink(type, item)}" target="_blank" class="bc-open-btn">
+         <svg viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+         Open in Business Central
+       </a>` : '';
+
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click', e => { if (e.target.id==='modal') closeModal(); });
+// Escape-handler zit al in notitie-sectie hierboven
+
+/* ══════════════════════════════════════════
+   DRAG & DROP
+   ══════════════════════════════════════════ */
+let dragState = null;
+
+function onTileDrag(event, idx) {
+  const entry = store[idx];
+  if (!entry) return;
+  dragState = { type: entry.type, item: entry.item, fromDate: iso(entry.date) };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', String(idx));
+  // Kleine vertraging zodat drag-beeld gerenderd is vóór opacity-change
+  setTimeout(() => event.target.classList.add('dragging'), 0);
+}
+
+function onTileDragEnd(event) {
+  event.target.classList.remove('dragging');
+}
+
+function onCatDragOver(event, dayStr, type) {
+  if (!dragState) return;
+  const sameType = dragState.type === type;
+  const sameDay  = dragState.fromDate === dayStr;
+  const el = event.currentTarget;
+  if (sameType && !sameDay) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+    el.classList.remove('drag-reject');
+  } else {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'none';
+    el.classList.add('drag-reject');
+    el.classList.remove('drag-over');
+  }
+}
+
+function onCatDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over', 'drag-reject');
+}
+
+async function onCatDrop(event, dayStr, type) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over', 'drag-reject');
+  if (!dragState) return;
+  const state = dragState;
+  dragState = null;
+  if (state.type !== type) return;
+  if (state.fromDate === dayStr) return;
+  if (!bcConnected) { showToast('Verbind eerst met BC om te verplaatsen'); return; }
+  await patchDate(state, dayStr);
+}
+
+async function patchDate(state, newDateStr) {
+  const { type, item } = state;
+  const oldDate = item.date;
+
+  // Optimistisch updaten — tegel beweegt meteen
+  item.date = newDateStr;
+  render();
+
+  try {
+    if (!bcConnected) {
+      // Niet verbonden → alleen lokaal verplaatsen
+      render();
+      return;
+    }
+    if (type === 'inkoop' && item._no) {
+      const coNamePO = encodeURIComponent(BC_CO_NAME);
+      await bcPatch(`${BC_ODATA}/Company('${coNamePO}')/PurchaseOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`,
+        { Due_Date: newDateStr }, item._etag || '*');
+      showToast('✓ Datum bijgewerkt in BC');
+      await refreshBCData();
+    } else if (type === 'transport' && item.ref && item.ref !== '—') {
+      const coName2 = encodeURIComponent(BC_CO_NAME);
+      await bcPatch(`${BC_ODATA}/Company('${coName2}')/SalesOrders(Document_Type='Order',No='${encodeURIComponent(item.ref)}')`,
+        { Promised_Delivery_Date: newDateStr }, item._etag);
+      showToast('✓ Datum bijgewerkt in BC');
+      await refreshBCData();
+    } else if (type === 'productie' && item._no) {
+      const coName  = encodeURIComponent(BC_CO_NAME);
+      const aoUrl   = `${BC_ODATA}/Company('${coName}')/AssemblyOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`;
+      // BC valideert Starting_Date <= Due_Date per veld afzonderlijk.
+      // oldDate = oorspronkelijke datum (item.date is al overschreven door optimistic update)
+      if (new Date(newDateStr) >= new Date(oldDate)) {
+        // Naar voren: eerst Due_Date verhogen, dan Starting_Date
+        await bcPatch(aoUrl, { Due_Date: newDateStr }, '*');
+        await bcPatch(aoUrl, { Starting_Date: newDateStr }, '*');
+      } else {
+        // Naar achteren: eerst Starting_Date verlagen, dan Due_Date
+        await bcPatch(aoUrl, { Starting_Date: newDateStr }, '*');
+        await bcPatch(aoUrl, { Due_Date: newDateStr }, '*');
+      }
+      showToast('✓ Datum bijgewerkt in BC');
+      await refreshBCData();
+    } else {
+      // Geen BC-koppeling voor dit item → alleen lokaal
+      render();
+    }
+  } catch(e) {
+    // Terugdraaien bij fout
+    item.date = oldDate;
+    render();
+    showToast('Fout bij opslaan: ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════
+   TOAST
+   ══════════════════════════════════════════ */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ══════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════ */
+render();
+// Na terugkeer van Microsoft-redirect: sessie is al gezet, direct doorgaan
+// Bij normaal bezoek: toon loginscherm tenzij sessie actief
+if (sessionStorage.getItem('planbord_auth') === '1') {
+  showApp();
+  initMsal(); // stille herverbinding of redirect-resultaat verwerken
+} else {
+  // Check of we terugkomen van een Microsoft-redirect (hash bevat 'code=')
+  // In dat geval heeft de gebruiker al ingelogd maar sessionStorage is leeg (nieuwe tab?)
+  if (window.location.hash.includes('code=') || window.location.hash.includes('error=')) {
+    // Herstel sessie en verwerk redirect
+    sessionStorage.setItem('planbord_auth', '1');
+    showApp();
+    initMsal();
+  }
+  // Anders: loginscherm blijft zichtbaar
+}
+</script>
+</body>
+</html>
