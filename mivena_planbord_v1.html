@@ -851,19 +851,25 @@ async function initMsal() {
       cache: { cacheLocation: 'sessionStorage' }
     });
     await msalApp.initialize();
-    await msalApp.handleRedirectPromise().catch(() => {});
+
+    // Verwerk redirect na login
+    const res = await msalApp.handleRedirectPromise().catch(() => null);
+    if (res) {
+      await bijVerbonden(res);
+      return;
+    }
 
     // Probeer stille login met bestaande sessie
     const accounts = msalApp.getAllAccounts();
     if (accounts.length > 0) {
-      const res = await msalApp.acquireTokenSilent({
+      const stil = await msalApp.acquireTokenSilent({
         scopes: [BC_SCOPE],
         account: accounts[0]
       }).catch(() => null);
-      if (res) await bijVerbonden(res);
+      if (stil) await bijVerbonden(stil);
     }
   } catch(e) {
-    console.warn('MSAL init:', e);
+    console.warn('MSAL init fout:', e);
     msalApp = null;
   }
   updateBCKnop();
@@ -878,22 +884,16 @@ async function toggleBC() {
     toon('Losgekoppeld van Business Central');
     return;
   }
-  // Zorg dat MSAL geladen is
   if (!msalApp) {
-    await initMsal();
-    if (!msalApp) {
-      toon('Pagina herladen en opnieuw proberen (F5)');
-      return;
-    }
+    toon('Pagina herladen en opnieuw proberen (F5)');
+    return;
   }
+  // Gebruik redirect (geen popup) — pagina gaat naar Microsoft en keert terug
   updateBCKnop('bezig');
   try {
-    const res = await msalApp.loginPopup({ scopes: [BC_SCOPE] });
-    await bijVerbonden(res);
+    await msalApp.loginRedirect({ scopes: [BC_SCOPE] });
   } catch(e) {
-    if (e.errorCode !== 'user_cancelled') {
-      toon('Inloggen mislukt: ' + (e.errorMessage || e.message || 'onbekende fout'));
-    }
+    toon('Inloggen mislukt: ' + (e.errorMessage || e.message || 'onbekende fout'));
     updateBCKnop();
   }
 }
