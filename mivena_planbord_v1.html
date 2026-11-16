@@ -285,25 +285,43 @@ body {
 .tl-scroll::-webkit-scrollbar-track { background: var(--groen-zacht); border-radius: 10px; }
 .tl-scroll::-webkit-scrollbar-thumb { background: var(--groen-licht); border-radius: 10px; }
 
-/* Tijdlijn = flex column van rijen */
+/* Tijdlijn = flex rij: rijen-kolom + weekend-knop */
 .tijdlijn {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-width: 850px;
   flex: 1;
+  gap: 8px;
+  align-items: stretch;
+}
+.tijdlijn-rijen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-/* Elke rij = grid met dezelfde kolomindeling */
+/* Elke rij = grid met dezelfde kolomindeling (zonder weekend-kolom) */
 .tl-rij {
   display: grid;
-  grid-template-columns: var(--tl-cols, repeat(5, minmax(160px, 1fr)) 48px);
+  grid-template-columns: var(--tl-cols, repeat(5, minmax(160px, 1fr)));
   column-gap: 8px;
   align-items: stretch;
 }
 
+/* Drag & drop */
+.item[draggable="true"] { cursor: grab; }
+.item.sleep-actief { opacity: 0.35; cursor: grabbing; }
+.tl-cat-cel.sleep-doel {
+  background: rgba(82,183,136,.12);
+  outline: 2px dashed var(--groen-licht);
+  outline-offset: -2px;
+}
+.tl-cat-cel.sleep-doel .cat-label { opacity: .5; }
+
 /* Dag-header cel (bovenste stuk per kolom) */
 .tl-dag-hoofd {
-  padding: 10px 12px 8px;
+  padding: 7px 10px 6px;
   border: 1px solid var(--lijn);
   border-bottom: none;
   border-radius: 12px 12px 0 0;
@@ -368,7 +386,7 @@ body {
 .dag-datum {
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
-  font-size: 22px;
+  font-size: 17px;
   line-height: 1;
   color: var(--groen-dark);
 }
@@ -550,12 +568,15 @@ body {
   border: 1px solid var(--lijn);
   border-radius: 12px;
   cursor: pointer;
+  flex: none;
+  width: 48px;
+  align-self: stretch;
+  min-height: unset;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 200px;
   transition: background .12s;
   user-select: none;
 }
@@ -1028,6 +1049,90 @@ async function bcGet(pad) {
   return r.json();
 }
 
+async function bcPatch(pad, body) {
+  const url = BC_API + pad;
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${bcToken}`,
+      'Content-Type': 'application/json',
+      'If-Match': '*'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`BC PATCH ${r.status}: ${t.substring(0, 200)}`);
+  }
+  return r.json().catch(() => null);
+}
+
+/* ══════════════════════════════════════
+   DRAG & DROP — SLEPEN NAAR ANDERE DAG
+══════════════════════════════════════ */
+let sleepIdx = null;
+
+function startSleep(event, idx) {
+  sleepIdx = idx;
+  event.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => event.target.classList.add('sleep-actief'), 0);
+}
+
+function stopSleep(event) {
+  event.target.classList.remove('sleep-actief');
+  sleepIdx = null;
+}
+
+function sleepOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  event.currentTarget.classList.add('sleep-doel');
+}
+
+function sleepWeg(event) {
+  event.currentTarget.classList.remove('sleep-doel');
+}
+
+async function latVallen(event, nieuweDatum, catType) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('sleep-doel');
+  if (sleepIdx === null) return;
+
+  const {type, item} = opslag[sleepIdx];
+  sleepIdx = null;
+
+  if (item.datum === nieuweDatum) return; // geen wijziging
+
+  if (!verbonden) { toon('Niet verbonden met BC'); return; }
+  if (!item._raw?.id) { toon('Order heeft geen ID — niet bij te werken'); return; }
+
+  const orderId = item._raw.id;
+  let endpoint, body;
+
+  if (type === 'inkoop') {
+    endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
+    // Probeer het datumveld dat eerder werkte
+    body = { requestedReceiptDate: nieuweDatum };
+  } else {
+    endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
+    body = { requestedDeliveryDate: nieuweDatum };
+  }
+
+  toon('Datum bijwerken in BC…');
+  try {
+    await bcPatch(endpoint, body);
+    toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
+    // Lokaal bijwerken voor directe weergave
+    item.datum = nieuweDatum;
+    teken();
+    // Volledige refresh op de achtergrond
+    setTimeout(() => haalData(), 1500);
+  } catch(e) {
+    console.error('PATCH fout:', e);
+    toon('Fout bij bijwerken: ' + e.message.substring(0, 80));
+  }
+}
+
 /* ══════════════════════════════════════
    DATA OPHALEN UIT BC
    - Inkoop:    inkooporders op expectedReceiptDate
@@ -1258,12 +1363,11 @@ function teken() {
   document.getElementById('totTransport').textContent =
     `${(kgTrn/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wTrn.length}`;
 
-  // Rij-gebaseerde layout: elke categorie is een horizontale rij
+  // Rij-gebaseerde layout
   const tl = document.getElementById('tijdlijn');
-  const kolommen = weekendOpen ? 7 : 5;
   const dagLijst = weekendOpen ? dagen : dagen.slice(0, 5);
-  tl.style.setProperty('--tl-cols', `repeat(${kolommen}, minmax(160px, 1fr)) 48px`);
-  tl.style.minWidth = weekendOpen ? '1240px' : '880px';
+  const kolommen = dagLijst.length;
+  tl.style.minWidth = weekendOpen ? '1200px' : '860px';
 
   function cls(d) {
     const ds = iso(d);
@@ -1282,27 +1386,32 @@ function teken() {
         <span class="weekend-tekst">Za + Zo</span>
        </div>`;
 
+  const cats = [
+    { key:'inkoop',    src:srcInkoop,    label:`${ICO_INKOOP}Inkoop`,    leeg:'Geen aanvoer'  },
+    { key:'productie', src:srcProductie, label:`${ICO_PROD}Productie`,   leeg:'Geen productie'},
+    { key:'transport', src:srcTransport, label:`${ICO_TRANS}Transport`,  leeg:'Geen transport'},
+  ];
+
+  // Bouw de rijen-kolom (zonder weekend-blok)
+  let rijHtml = '';
+  const kolCss = `repeat(${kolommen}, minmax(0, 1fr))`;
+
   // RIJ 1: dag-headers
-  let html = `<div class="tl-rij">`;
+  rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss}">`;
   dagLijst.forEach(d => {
     const {ds, v, w, extra} = cls(d);
-    html += `<div class="tl-dag-hoofd${extra}">
+    rijHtml += `<div class="tl-dag-hoofd${extra}">
       ${v ? '<span class="vandaag-pip">Vandaag</span>' : ''}
       <div class="dag-naam">${DAGAMEN(d.getDay())}</div>
       <div class="dag-datum">${d.getDate()}</div>
       <div class="dag-maand">${MAANDNAMEN[d.getMonth()]}</div>
     </div>`;
   });
-  html += wkndKnop + `</div>`;
+  rijHtml += `</div>`;
 
-  // RIJEN 2-4: categorie-rijen (inkoop, productie, transport)
-  const cats = [
-    { key:'inkoop',    src:srcInkoop,    label:`${ICO_INKOOP}Inkoop`,    leeg:'Geen aanvoer'  },
-    { key:'productie', src:srcProductie, label:`${ICO_PROD}Productie`,   leeg:'Geen productie'},
-    { key:'transport', src:srcTransport, label:`${ICO_TRANS}Transport`,  leeg:'Geen transport'},
-  ];
+  // RIJEN 2-4: categorie-rijen met drag & drop
   cats.forEach(cat => {
-    html += `<div class="tl-rij">`;
+    rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss}">`;
     dagLijst.forEach(d => {
       const {ds, v, w, extra} = cls(d);
       const items = cat.src.filter(x => x.datum === ds);
@@ -1310,22 +1419,28 @@ function teken() {
         ? items.map(item => {
             const i = bewaar({type: cat.key, item, d});
             const naam = cat.key === 'inkoop' ? (item.leverancier||'—') : (item.klant||'—');
-            return `<div class="item ${cat.key}" onclick="toonDetail(${i})">
+            return `<div class="item ${cat.key}" draggable="true"
+              onclick="toonDetail(${i})"
+              ondragstart="startSleep(event,${i})"
+              ondragend="stopSleep(event)">
               <div class="item-naam">${esc(naam)}</div>
               <div class="item-sub">${esc(item.ref||'—')}</div>
             </div>`;
           }).join('')
         : `<div class="leeg">${verbonden ? 'Geen orders in BC' : cat.leeg}</div>`;
-      html += `<div class="tl-cat-cel ${cat.key}${extra}">
+      rijHtml += `<div class="tl-cat-cel ${cat.key}${extra}"
+        ondragover="sleepOver(event)"
+        ondragleave="sleepWeg(event)"
+        ondrop="latVallen(event,'${ds}','${cat.key}')">
         <div class="cat-label ${cat.key}">${cat.label}</div>
         <div class="cat-body">${rijen}</div>
       </div>`;
     });
-    html += `<div class="tl-lege-cel"></div></div>`;
+    rijHtml += `</div>`;
   });
 
   // RIJ 5: notities
-  html += `<div class="tl-rij">`;
+  rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss}">`;
   dagLijst.forEach(d => {
     const {ds, v, w, extra} = cls(d);
     const notitie = notities[ds] || null;
@@ -1336,7 +1451,7 @@ function teken() {
            <span class="notitie-tijd">${notitie.tijdstip}</span>
          </div>`
       : `<div class="notitie-info" id="ni-${ds}" style="display:none"></div>`;
-    html += `<div class="tl-not-cel${extra}">
+    rijHtml += `<div class="tl-not-cel${extra}">
       <div class="notitie-label">${ICO_PEN}Notitie</div>
       <textarea class="notitie-veld" id="nt-${ds}"
         placeholder="Voeg een notitie toe…"
@@ -1345,9 +1460,9 @@ function teken() {
       <div class="opgeslagen-ind" id="oi-${ds}">✓ Opgeslagen</div>
     </div>`;
   });
-  html += `<div class="tl-lege-cel"></div></div>`;
+  rijHtml += `</div>`;
 
-  tl.innerHTML = html;
+  tl.innerHTML = `<div class="tijdlijn-rijen">${rijHtml}</div>${wkndKnop}`;
 }
 
 function DAGAMEN(n) { return DAGAMEN._d ? DAGAMEN._d[n] : (DAGAMEN._d = DAGAMEN_arr())[n]; }
