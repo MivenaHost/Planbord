@@ -863,7 +863,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport</div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.3</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -961,6 +961,7 @@ body {
       <div class="modal-type notitie">Notitie</div>
       <div id="notModalTitel" class="modal-naam">—</div>
       <div id="notModalDatum" class="modal-datum">—</div>
+      <button onclick="verwijderNotitie()" style="position:absolute;top:14px;right:50px;background:none;border:1px solid #FECACA;border-radius:7px;padding:3px 10px;font-size:11.5px;font-weight:600;color:#C0392B;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">Verwijder</button>
       <button class="modal-sluiten" onclick="sluitNotitieModal()">
         <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
       </button>
@@ -999,6 +1000,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
+const VERSIE     = '1.3';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1333,8 +1335,9 @@ async function latVallen(event, nieuweDatum, catType) {
    - Productie: requestedDeliveryDate (verzochte leverdatum)
    - Transport: promisedDeliveryDate / toegezegde leverdatum (auto-detect)
 ══════════════════════════════════════ */
-let prdDateVeld = 'requestedDeliveryDate';
-let trnDateVeld = 'requestedDeliveryDate'; // wordt overschreven als beter veld gevonden
+let prdDateVeld    = 'requestedDeliveryDate';
+let trnDateVeld    = 'requestedDeliveryDate'; // wordt overschreven als beter veld gevonden
+let trnApiFallback = true; // true = toegezegde leverdatum niet in BC API (zelfde weergave als productie)
 
 async function haalData() {
   if (!verbonden || !bcBedrijfId) return;
@@ -1372,35 +1375,44 @@ async function haalData() {
     } catch(e) { alleSORes = { value: [] }; }
     const alleOrders = alleSORes?.value || [];
 
-    // Log alle veldnamen van een sample order zodat we het transport-veld kunnen ontdekken
+    // ── VELD-DETECTIE: haal één volledige order op om ALLE veldnamen te zien ──
+    // De lijst-API geeft soms minder velden terug dan een individuele GET.
+    let volledigeSample = null;
     if (alleOrders.length > 0) {
-      const sample = alleOrders[0];
-      const datumVelden = Object.entries(sample)
-        .filter(([k,v]) => v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)))
-        .map(([k,v]) => `${k}=${v}`);
-      console.log('Verkooporder datumvelden (sample):', datumVelden.join(' | '));
+      try {
+        volledigeSample = await bcGet(`/companies(${bcBedrijfId})/salesOrders(${alleOrders[0].id})`);
+        console.log('ALLE veldnamen verkooporder:', Object.keys(volledigeSample).join(' | '));
+        const datumAchtig = Object.entries(volledigeSample)
+          .filter(([k,v]) => v === null || v === '' || (typeof v === 'string' && /^\d{4}/.test(v)))
+          .map(([k,v]) => `${k}=${JSON.stringify(v)}`);
+        console.log('Datum-achtige velden (volledig):', datumAchtig.join(' | '));
+      } catch(e) { volledigeSample = alleOrders[0]; }
     }
+    const refOrder = volledigeSample || (alleOrders[0] || {});
 
-    // ── PRODUCTIE ── requestedDeliveryDate (verzochte leverdatum)
-    prdDateVeld = 'requestedDeliveryDate';
-    const soPrdRes = { value: alleOrders.filter(so => dagSet.has((so.requestedDeliveryDate||'').substring(0,10))) };
-    console.log('Productie (requestedDeliveryDate) orders in week:', soPrdRes.value.length);
+    // ── PRODUCTIE ── probeer een veld ANDERS dan requestedDeliveryDate voor onafhankelijkheid
+    const prdKandidaten = ['dueDate','shipmentDate','requestedShipmentDate','plannedShipmentDate','plannedDeliveryDate'];
+    let gevondenPrdVeld = null;
+    for (const k of prdKandidaten) {
+      if (k in refOrder) { gevondenPrdVeld = k; break; } // veld bestaat (ook als null/leeg)
+    }
+    prdDateVeld = gevondenPrdVeld || 'requestedDeliveryDate';
+    console.log('Productie datumveld:', prdDateVeld, gevondenPrdVeld ? '(gevonden)' : '(fallback = zelfde als Transport)');
 
-    // ── TRANSPORT ── toegezegde leverdatum: probeer kandidaat-velden
-    // Standaard BC API veld: promisedDeliveryDate. Sommige installaties gebruiken andere namen.
-    const trnKandidaten = ['promisedDeliveryDate','plannedDeliveryDate','shipmentDate','requestedShipmentDate'];
+    const soPrdRes = { value: alleOrders.filter(so => dagSet.has((so[prdDateVeld]||'').substring(0,10))) };
+    console.log('Productie orders in week:', soPrdRes.value.length);
+
+    // ── TRANSPORT ── requestedDeliveryDate (toegezegde leverdatum / beste beschikbare proxy)
+    const trnKandidaten = ['promisedDeliveryDate','plannedDeliveryDate'];
     let gevondenTrnVeld = null;
     for (const k of trnKandidaten) {
-      if (alleOrders.some(so => k in so && so[k] && so[k] !== '0001-01-01')) {
-        gevondenTrnVeld = k;
-        break;
-      }
+      if (k in refOrder) { gevondenTrnVeld = k; break; }
     }
     trnDateVeld = gevondenTrnVeld || 'requestedDeliveryDate';
+    trnApiFallback = !gevondenTrnVeld; // true = toegezegde leverdatum niet in API
     console.log('Transport datumveld:', trnDateVeld, gevondenTrnVeld ? '(gevonden)' : '(fallback — toegezegde leverdatum niet in API)');
 
     const soTrnRes = { value: alleOrders.filter(so => dagSet.has((so[trnDateVeld]||'').substring(0,10))) };
-    if (!soTrnRes) soTrnRes = { value: [] };
 
     liveData = {
       inkoop:    verwerkInkoop(poRes),
@@ -1592,10 +1604,13 @@ function teken() {
         <span class="weekend-tekst">Za + Zo</span>
        </div>`;
 
+  const trnWarning = trnApiFallback
+    ? ` <span title="Toegezegde leverdatum niet beschikbaar in BC API — zelfde weergave als Productie" style="font-size:9px;opacity:.6;font-weight:400;letter-spacing:0;text-transform:none;cursor:help">⚠ zelfde veld als Productie</span>`
+    : '';
   const cats = [
-    { key:'inkoop',    src:srcInkoop,    label:`${ICO_INKOOP}Inkoop`,    leeg:'Geen aanvoer'  },
-    { key:'productie', src:srcProductie, label:`${ICO_PROD}Productie`,   leeg:'Geen productie'},
-    { key:'transport', src:srcTransport, label:`${ICO_TRANS}Transport`,  leeg:'Geen transport'},
+    { key:'inkoop',    src:srcInkoop,    label:`${ICO_INKOOP}Inkoop`,                  leeg:'Geen aanvoer'  },
+    { key:'productie', src:srcProductie, label:`${ICO_PROD}Productie`,                 leeg:'Geen productie'},
+    { key:'transport', src:srcTransport, label:`${ICO_TRANS}Transport${trnWarning}`,   leeg:'Geen transport'},
   ];
 
   // Bouw de rijen-kolom (zonder weekend-blok)
@@ -1792,6 +1807,17 @@ function voegReactieToe() {
 
 function sluitNotitieModal() {
   document.getElementById('notitieModal').classList.remove('open');
+}
+
+function verwijderNotitie() {
+  if (!_notActiefDatum || !_notActiefId) return;
+  if (!confirm('Notitie verwijderen?')) return;
+  const nots = notities[_notActiefDatum] || [];
+  notities[_notActiefDatum] = nots.filter(n => n.id !== _notActiefId);
+  if (!notities[_notActiefDatum].length) delete notities[_notActiefDatum];
+  opslaanNotities();
+  sluitNotitieModal();
+  teken();
 }
 
 /* ══════════════════════════════════════
