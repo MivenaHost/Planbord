@@ -873,7 +873,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.6</span></div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.7</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -1095,7 +1095,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '1.6';
+const VERSIE     = '1.7';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1405,9 +1405,9 @@ async function latVallen(event, nieuweDatum, catType) {
 
   try {
     if (type === 'inkoop') {
-      // Inkoop → REST API, expectedReceiptDate (verwachte ontvangstdatum)
+      // Inkoop → REST API, gebruik het veld dat bij haalData() werkte
       const ep = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
-      await bcPatch(ep, { expectedReceiptDate: nieuweDatum });
+      await bcPatch(ep, { [inkVeldActief]: nieuweDatum });
 
     } else if (type === 'productie') {
       // Productie → OData, Due_Date (vervaldatum/productiedatum)
@@ -1476,6 +1476,7 @@ let prdDateVeld    = _inst.productie || '';   // leeg = auto-detect
 let trnDateVeld    = _inst.transport || '';   // leeg = auto-detect
 let trnApiFallback = true;
 let _alleSOVelden  = []; // wordt gevuld bij haalData voor weergave in instellingen
+let inkVeldActief  = 'requestedReceiptDate'; // wordt ingesteld door haalData na auto-detect
 
 async function haalData() {
   if (!verbonden || !bcBedrijfId) return;
@@ -1487,8 +1488,10 @@ async function haalData() {
 
   updateBCKnop('bezig');
   try {
-    // ── INKOOP ── expectedReceiptDate (verwachte ontvangstdatum)
-    const poDateVelden = ['expectedReceiptDate','requestedReceiptDate','dueDate','orderDate'];
+    // ── INKOOP ── auto-detect datumveld (verwachte ontvangstdatum)
+    const poDateVelden = _inst.inkoop
+      ? [_inst.inkoop]
+      : ['requestedReceiptDate','expectedReceiptDate','dueDate','orderDate'];
     let poRes = null;
     for (const veld of poDateVelden) {
       try {
@@ -1496,10 +1499,11 @@ async function haalData() {
           `/companies(${bcBedrijfId})/purchaseOrders` +
           `?$filter=${veld} ge ${van} and ${veld} le ${tot}`
         );
+        inkVeldActief = veld;  // onthoud welk veld werkt voor PATCH
         console.log('Inkoop datumveld:', veld, '→', poRes.value?.length, 'orders');
         break;
       } catch(e) {
-        if (!e.message.includes('Could not find a property') && !e.message.includes('does not exist on type')) throw e;
+        if (!e.message.includes('Could not find a property') && !e.message.includes('does not exist on type') && !e.message.includes('does not exist')) throw e;
       }
     }
     if (!poRes) poRes = { value: [] };
@@ -2042,9 +2046,9 @@ async function kiesOrder(orderId, ref, naam) {
   toon('Datum instellen in BC…');
   try {
     if (_pickerType === 'inkoop') {
-      // Inkoop → REST API, expectedReceiptDate (verwachte ontvangstdatum)
+      // Inkoop → REST API, gebruik het veld dat bij haalData() werkte
       await bcPatch(`/companies(${bcBedrijfId})/purchaseOrders(${orderId})`,
-        { expectedReceiptDate: _pickerDatum });
+        { [inkVeldActief]: _pickerDatum });
 
     } else if (_pickerType === 'productie') {
       // Productie → OData, Due_Date (vervaldatum/productiedatum)
@@ -2168,16 +2172,44 @@ function toonDetail(idx) {
 
   // OData orders hebben geen GUID maar wel een ordernummer als _odataNo
   const orderId = r.id || r._odataNo || null;
+  const isOdata  = r._source === 'odata';
+
+  // Orderregels knop
   const detailKnop = orderId && verbonden ? `
     <button class="detail-knop" onclick="haalOrderRegels('${orderId}', '${type}')">
       <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Gedetailleerde informatie — orderregels ophalen
+      Orderregels ophalen
     </button>
-    <div id="regelsSectie"></div>
   ` : '';
 
-  document.getElementById('modalBody').innerHTML = rijen + detailKnop;
+  // "Verwijder uit planning" knop — alleen voor productie en transport (OData verkooporders)
+  const verwijderKnop = (type === 'productie' || type === 'transport') && isOdata && orderId && verbonden ? `
+    <button class="detail-knop" onclick="verwijderUitPlanning('${orderId}','${type}')"
+      style="background:#FFF0F0;color:#C0392B;border-color:#F5C6C6;margin-top:6px">
+      <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Verwijder uit planning (maakt datum leeg in BC)
+    </button>
+  ` : '';
+
+  document.getElementById('modalBody').innerHTML = rijen + detailKnop + verwijderKnop + '<div id="regelsSectie"></div>';
   document.getElementById('modal').classList.add('open');
+}
+
+async function verwijderUitPlanning(orderNo, type) {
+  if (!confirm(`Datum verwijderen uit planning voor order ${orderNo}?\nHet veld in Business Central wordt leeggemaakt.`)) return;
+  sluitModal();
+  toon('Datum verwijderen in BC…');
+  try {
+    const datumVeld = type === 'productie' ? prdDateVeld : trnDateVeld;
+    const odataVeld = naarODataVeld(datumVeld);
+    const url = `${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderNo)}')`;
+    await bcPatch(url, { [odataVeld]: null });
+    toon('✓ Datum verwijderd — ' + orderNo + ' staat niet meer ingepland');
+    setTimeout(() => haalData(), 1200);
+  } catch(e) {
+    console.error('Verwijder fout:', e);
+    toon('⚠ ' + e.message.substring(0, 130));
+  }
 }
 
 async function haalOrderRegels(orderId, type) {
