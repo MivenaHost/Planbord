@@ -952,7 +952,7 @@ const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
 const BC_ENV     = 'MivenaSandbox01';
-const BC_CO_NAME = 'CRONUS NL';
+const WK46 Test = 'CRONUS NL';
 const BC_SCOPE   = 'https://api.businesscentral.dynamics.com/user_impersonation';
 const BC_API     = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/api/v2.0`;
 const BC_ODATA   = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/ODataV4`;
@@ -1226,8 +1226,8 @@ async function onLoginSuccess(result) {
   // Bedrijf opzoeken
   updateBCButton('bezig');
   const cmpData = await bcGet('/companies');
-  const company = (cmpData.value || []).find(c => c.name === BC_CO_NAME) || (cmpData.value || [])[0];
-  if (!company) throw new Error('Bedrijf "' + BC_CO_NAME + '" niet gevonden in BC');
+  const company = (cmpData.value || []).find(c => c.name === WK46 Test) || (cmpData.value || [])[0];
+  if (!company) throw new Error('Bedrijf "' + WK46 Test + '" niet gevonden in BC');
   bcCompanyId = company.id;
   bcConnected  = true;
 
@@ -1283,7 +1283,7 @@ async function refreshBCData() {
   const days = weekDays(page);
   const sd = iso(days[0]), ed = iso(days[6]);
   updateBCButton('bezig');
-  const coName = encodeURIComponent(BC_CO_NAME);
+  const coName = encodeURIComponent(WK46 Test);
   try {
     const [poRes, soRes, soPrdRes, prRes, ssRes] = await Promise.all([
       bcGet(`${BC_ODATA}/Company('${coName}')/PurchaseOrders?$filter=Due_Date ge ${sd} and Due_Date le ${ed}`).catch(() => null),
@@ -1315,7 +1315,7 @@ function fInitialen(ini) {
 
 function bcDeepLink(type, item) {
   const base = `https://businesscentral.dynamics.com/${BC_TENANT}/${BC_ENV}/`;
-  const co   = encodeURIComponent(BC_CO_NAME);
+  const co   = encodeURIComponent(WK46 Test);
   const page = type === 'inkoop' ? 50 : 42;
   return `${base}?company=${co}&page=${page}&dc=0`;
 }
@@ -1505,7 +1505,7 @@ function updateBCButton(staat) {
     fn.style.cssText = 'background:#EAF5EE;border-bottom-color:#B4D9C4;color:#1A5E35';
     fp.style.background = '#2D7A4F';
     fp.textContent = 'LIVE';
-    fm.textContent = `Verbonden met Business Central · ${BC_CO_NAME}`;
+    fm.textContent = `Verbonden met Business Central · ${WK46 Test}`;
     document.getElementById('btnRefresh').style.display = '';
   } else {
     btn.innerHTML = `Verbinden met BC`;
@@ -1921,19 +1921,19 @@ async function patchDate(state, newDateStr) {
       return;
     }
     if (type === 'inkoop' && item._no) {
-      const coNamePO = encodeURIComponent(BC_CO_NAME);
+      const coNamePO = encodeURIComponent(WK46 Test);
       await bcPatch(`${BC_ODATA}/Company('${coNamePO}')/PurchaseOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`,
         { Due_Date: newDateStr }, item._etag || '*');
       showToast('✓ Datum bijgewerkt in BC');
       await refreshBCData();
     } else if (type === 'transport' && item.ref && item.ref !== '—') {
-      const coName2 = encodeURIComponent(BC_CO_NAME);
+      const coName2 = encodeURIComponent(WK46 Test);
       await bcPatch(`${BC_ODATA}/Company('${coName2}')/SalesOrders(Document_Type='Order',No='${encodeURIComponent(item.ref)}')`,
         { Promised_Delivery_Date: newDateStr }, item._etag);
       showToast('✓ Datum bijgewerkt in BC');
       await refreshBCData();
     } else if (type === 'productie' && item._no) {
-      const coNameSO = encodeURIComponent(BC_CO_NAME);
+      const coNameSO = encodeURIComponent(WK46 Test);
       await bcPatch(`${BC_ODATA}/Company('${coNameSO}')/SalesOrders(Document_Type='Order',No='${encodeURIComponent(item._no)}')`,
         { Due_Date: newDateStr }, item._etag || '*');
       showToast('✓ Vervaldatum bijgewerkt in BC');
