@@ -950,21 +950,21 @@ async function haalData() {
 
   updateBCKnop('bezig');
   try {
-    // Haal inkooporders op (datum = verwachte ontvangst)
+    // Haal inkooporders op (datum = requestedReceiptDate = Verwachte ontvangstdatum)
     const poRes = await bcGet(
       `/companies(${bcBedrijfId})/purchaseOrders` +
-      `?$filter=expectedReceiptDate ge ${van} and expectedReceiptDate le ${tot}` +
+      `?$filter=requestedReceiptDate ge ${van} and requestedReceiptDate le ${tot}` +
       `&$expand=purchaseOrderLines`
     );
 
-    // Haal verkooporders op voor productie (datum = vervaldatum)
+    // Haal verkooporders op voor productie (datum = dueDate = Vervaldatum)
     const soPrdRes = await bcGet(
       `/companies(${bcBedrijfId})/salesOrders` +
       `?$filter=dueDate ge ${van} and dueDate le ${tot}` +
       `&$expand=salesOrderLines`
     );
 
-    // Haal verkooporders op voor transport (datum = toegezegde/verzochte leverdatum)
+    // Haal verkooporders op voor transport (datum = requestedDeliveryDate = Toegezegde leverdatum)
     const soTrnRes = await bcGet(
       `/companies(${bcBedrijfId})/salesOrders` +
       `?$filter=requestedDeliveryDate ge ${van} and requestedDeliveryDate le ${tot}` +
@@ -994,7 +994,7 @@ function verwerkInkoop(res) {
     (po.purchaseOrderLines?.value || []).forEach(r => {
       if (!['Item','item'].includes(r.lineType)) return;
       uit.push({
-        datum:       (po.expectedReceiptDate || '').substring(0,10),
+        datum:       (po.requestedReceiptDate || po.dueDate || '').substring(0,10),
         ref:         po.number,
         leverancier: po.vendorName,
         artikel:     r.description || r.itemId,
