@@ -347,6 +347,11 @@ body {
   border-top: 1px solid var(--lijn);
   display: flex;
   flex-direction: column;
+  min-height: 90px;
+}
+.tl-cat-cel .cat-body {
+  flex: 1;
+  max-height: none;
 }
 .tl-cat-cel.vandaag {
   border-left-color: var(--groen-licht);
@@ -1056,13 +1061,23 @@ async function bcPatch(pad, body) {
     headers: {
       'Authorization': `Bearer ${bcToken}`,
       'Content-Type': 'application/json',
-      'If-Match': '*'
+      'If-Match': '*',
+      'Prefer': 'return=representation'
     },
     body: JSON.stringify(body)
   });
   if (!r.ok) {
     const t = await r.text().catch(() => '');
-    throw new Error(`BC PATCH ${r.status}: ${t.substring(0, 200)}`);
+    console.error('BC PATCH fout:', t);
+    // Probeer foutmelding te parsen
+    try {
+      const err = JSON.parse(t);
+      const msg = err?.error?.message || err?.message || t;
+      throw new Error(msg.substring(0, 150));
+    } catch(pe) {
+      if (pe.message !== t.substring(0, 150)) throw pe;
+      throw new Error(`BC ${r.status}: ${t.substring(0, 150)}`);
+    }
   }
   return r.json().catch(() => null);
 }
@@ -1111,25 +1126,37 @@ async function latVallen(event, nieuweDatum, catType) {
 
   if (type === 'inkoop') {
     endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
-    // Probeer het datumveld dat eerder werkte
     body = { requestedReceiptDate: nieuweDatum };
   } else {
     endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-    body = { requestedDeliveryDate: nieuweDatum };
+    // Transport = toegezegde leverdatum (promisedDeliveryDate)
+    // Productie = verzochte leverdatum (requestedDeliveryDate)
+    body = type === 'transport'
+      ? { promisedDeliveryDate: nieuweDatum }
+      : { requestedDeliveryDate: nieuweDatum };
   }
 
   toon('Datum bijwerken in BC…');
   try {
     await bcPatch(endpoint, body);
     toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
-    // Lokaal bijwerken voor directe weergave
     item.datum = nieuweDatum;
     teken();
-    // Volledige refresh op de achtergrond
-    setTimeout(() => haalData(), 1500);
+    setTimeout(() => haalData(), 2000);
   } catch(e) {
     console.error('PATCH fout:', e);
-    toon('Fout bij bijwerken: ' + e.message.substring(0, 80));
+    // Als requestedDeliveryDate geblokkeerd wordt, probeer promisedDeliveryDate
+    if (type === 'productie' && e.message.includes('kunt d')) {
+      try {
+        await bcPatch(endpoint, { promisedDeliveryDate: nieuweDatum });
+        toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
+        item.datum = nieuweDatum;
+        teken();
+        setTimeout(() => haalData(), 2000);
+        return;
+      } catch(e2) { /* toon originele fout */ }
+    }
+    toon('⚠ Datum niet bijgewerkt: ' + e.message.substring(0, 100));
   }
 }
 
@@ -1409,9 +1436,9 @@ function teken() {
   });
   rijHtml += `</div>`;
 
-  // RIJEN 2-4: categorie-rijen met drag & drop
+  // RIJEN 2-4: categorie-rijen met drag & drop (flex:1 zodat ze groeien)
   cats.forEach(cat => {
-    rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss}">`;
+    rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss};flex:1">`;
     dagLijst.forEach(d => {
       const {ds, v, w, extra} = cls(d);
       const items = cat.src.filter(x => x.datum === ds);
