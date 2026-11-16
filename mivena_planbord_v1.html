@@ -950,32 +950,50 @@ async function haalData() {
 
   updateBCKnop('bezig');
   try {
-    // Haal inkooporders op (datum = requestedReceiptDate = Verwachte ontvangstdatum)
-    const poRes = await bcGet(
-      `/companies(${bcBedrijfId})/purchaseOrders` +
-      `?$filter=requestedReceiptDate ge ${van} and requestedReceiptDate le ${tot}` +
-      `&$expand=purchaseOrderLines`
-    );
-
-    // Haal verkooporders op — probeer verschillende datumvelden
-    const soDateVelden = ['shipmentDate','dueDate','requestedDeliveryDate','promisedDeliveryDate','orderDate'];
-    let soDateVeld = 'orderDate';
-    let soPrdRes = null;
-    for (const veld of soDateVelden) {
+    // Haal inkooporders op — probeer verschillende datumvelden, zonder expand
+    const poDateVelden = ['requestedReceiptDate','expectedReceiptDate','dueDate','orderDate'];
+    let poRes = null;
+    for (const veld of poDateVelden) {
       try {
-        soPrdRes = await bcGet(
-          `/companies(${bcBedrijfId})/salesOrders` +
-          `?$filter=${veld} ge ${van} and ${veld} le ${tot}` +
-          `&$expand=salesOrderLines`
+        poRes = await bcGet(
+          `/companies(${bcBedrijfId})/purchaseOrders` +
+          `?$filter=${veld} ge ${van} and ${veld} le ${tot}`
         );
-        soDateVeld = veld;
-        console.log('Verkooporder datumveld gevonden:', veld);
+        console.log('Inkooporder datumveld gevonden:', veld);
         break;
       } catch(e) {
         if (!e.message.includes('Could not find a property')) throw e;
       }
     }
+    if (!poRes) poRes = { value: [] };
+
+    // Haal verkooporders op voor Productie — filtereer op requestedDeliveryDate (vervaldatum)
+    let soPrdRes = null;
+    try {
+      soPrdRes = await bcGet(
+        `/companies(${bcBedrijfId})/salesOrders` +
+        `?$filter=requestedDeliveryDate ge ${van} and requestedDeliveryDate le ${tot}`
+      );
+    } catch(e) {
+      soPrdRes = { value: [] };
+    }
     if (!soPrdRes) soPrdRes = { value: [] };
+    console.log('Productie orders gevonden:', soPrdRes.value?.length);
+
+    // Als 0 resultaten met datum filter, haal alle orders op voor debug
+    if (soPrdRes.value?.length === 0) {
+      try {
+        const alleRes = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=5`);
+        if (alleRes?.value?.length > 0) {
+          console.log('DEBUG - sample salesOrder velden:', Object.keys(alleRes.value[0]));
+          console.log('DEBUG - sample order:', JSON.stringify(alleRes.value[0]).substring(0, 500));
+        } else {
+          console.log('DEBUG - geen open verkooporders gevonden in BC');
+        }
+      } catch(e) {}
+    }
+
+    // Transport — zelfde data, maar apart zoeken (kan later ander veld worden)
     const soTrnRes = soPrdRes;
 
     liveData = {
@@ -998,15 +1016,14 @@ async function haalData() {
 function verwerkInkoop(res) {
   const uit = [];
   (res.value || []).forEach(po => {
-    (po.purchaseOrderLines?.value || []).forEach(r => {
-      if (!['Item','item'].includes(r.lineType)) return;
-      uit.push({
-        datum:       (po.requestedReceiptDate || po.dueDate || '').substring(0,10),
-        ref:         po.number,
-        leverancier: po.vendorName,
-        artikel:     r.description || r.itemId,
-        hoeveelheid: r.quantity || 0
-      });
+    const datum = (po.requestedReceiptDate || po.expectedReceiptDate || po.dueDate || po.orderDate || '').substring(0,10);
+    if (!datum) return;
+    uit.push({
+      datum,
+      ref:         po.number,
+      leverancier: po.vendorName || po.vendorNumber || '—',
+      artikel:     po.vendorName ? '' : '—',
+      hoeveelheid: ''
     });
   });
   return uit;
@@ -1015,19 +1032,16 @@ function verwerkInkoop(res) {
 function verwerkProductie(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    // Gebruik het eerste datumveld dat beschikbaar is
-    const datum = (so.shipmentDate || so.dueDate || so.requestedDeliveryDate
-                || so.promisedDeliveryDate || so.orderDate || '').substring(0,10);
-    (so.salesOrderLines?.value || []).forEach(r => {
-      if (!['Item','item'].includes(r.lineType)) return;
-      uit.push({
-        datum,
-        ref:      so.number,
-        klant:    so.customerName,
-        artikel:  r.description || r.itemId,
-        hoeveelheid: r.quantity || 0,
-        orderdatum:  (so.orderDate || '').substring(0,10)
-      });
+    // Vervaldatum = requestedDeliveryDate (beschikbaar in deze omgeving)
+    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    if (!datum) return;
+    uit.push({
+      datum,
+      ref:         so.number,
+      klant:       so.customerName || so.customerNumber || '—',
+      artikel:     '',
+      hoeveelheid: '',
+      orderdatum:  (so.orderDate || '').substring(0,10)
     });
   });
   return uit;
@@ -1036,18 +1050,16 @@ function verwerkProductie(res) {
 function verwerkTransport(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    const datum = (so.shipmentDate || so.dueDate || so.requestedDeliveryDate
-                || so.promisedDeliveryDate || so.orderDate || '').substring(0,10);
-    (so.salesOrderLines?.value || []).forEach(r => {
-      if (!['Item','item'].includes(r.lineType)) return;
-      uit.push({
-        datum,
-        ref:      so.number,
-        klant:    so.customerName,
-        artikel:  r.description || r.itemId,
-        hoeveelheid: r.quantity || 0,
-        vervaldatum: datum
-      });
+    // Toegezegde leverdatum = requestedDeliveryDate
+    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    if (!datum) return;
+    uit.push({
+      datum,
+      ref:         so.number,
+      klant:       so.customerName || so.customerNumber || '—',
+      artikel:     '',
+      hoeveelheid: '',
+      vervaldatum: datum
     });
   });
   return uit;
