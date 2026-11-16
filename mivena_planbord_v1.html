@@ -873,7 +873,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.8</span></div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.9</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -1095,7 +1095,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '1.8';
+const VERSIE     = '1.9';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1271,6 +1271,7 @@ async function initMsal() {
 async function toggleBC() {
   if (verbonden) {
     verbonden = false; bcToken = null; bcBedrijfId = null; liveData = null;
+    stopAutoRefresh();
     msalApp?.clearCache();
     updateBCKnop();
     teken();
@@ -1310,6 +1311,7 @@ async function bijVerbonden(res) {
   if (!bedrijf) throw new Error(`Bedrijf "${BC_CO_NAAM}" niet gevonden`);
   bcBedrijfId = bedrijf.id;
   verbonden   = true;
+  startAutoRefresh();
 
   toon('Verbonden met ' + bedrijf.name);
   await haalData();
@@ -1389,6 +1391,13 @@ async function latVallen(event, nieuweDatum, catType) {
 
   const {type, item} = opslag[sleepIdx];
   sleepIdx = null;
+
+  // Blokkeer slepen naar verkeerde categorie
+  if (type !== catType) {
+    const namen = { inkoop: 'Inkoop', productie: 'Productie', transport: 'Transport' };
+    toon(`⚠ ${namen[type]}-order kan niet naar ${namen[catType]} worden gesleept`);
+    return;
+  }
 
   if (item.datum === nieuweDatum) return;
   if (!verbonden) { toon('Niet verbonden met BC'); return; }
@@ -2353,6 +2362,31 @@ function toon(bericht) {
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('zichtbaar'), 2500);
 }
+
+/* ══════════════════════════════════════
+   AUTO-REFRESH (elke 3 minuten)
+══════════════════════════════════════ */
+const AUTO_REFRESH_MS = 3 * 60 * 1000;
+let _autoRefreshTimer = null;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  _autoRefreshTimer = setInterval(() => {
+    if (verbonden && bcBedrijfId) {
+      console.log('Auto-refresh…');
+      haalData();
+    }
+  }, AUTO_REFRESH_MS);
+}
+
+function stopAutoRefresh() {
+  if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+}
+
+// Start zodra er verbinding is (wordt aangeroepen vanuit verbindLogica)
+document.addEventListener('bc-verbonden', () => startAutoRefresh());
+// Stop bij pagina verlaten
+window.addEventListener('beforeunload', stopAutoRefresh);
 
 /* ══════════════════════════════════════
    START
