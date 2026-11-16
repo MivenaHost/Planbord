@@ -452,6 +452,15 @@ body {
   border-bottom: 1px solid #B2DDBF;
 }
 
+.cat-plus-btn {
+  background: rgba(255,255,255,.65); border: 1px solid rgba(0,0,0,.12);
+  border-radius: 5px; width: 18px; height: 18px; cursor: pointer;
+  font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  color: inherit; font-weight: 700; padding: 0; transition: background .1s;
+  flex: none;
+}
+.cat-plus-btn:hover { background: rgba(255,255,255,.95); }
+
 .cat-body {
   min-height: 70px;
   max-height: 130px;
@@ -465,6 +474,24 @@ body {
 }
 .cat-body::-webkit-scrollbar { width: 3px; }
 .cat-body::-webkit-scrollbar-thumb { background: var(--lijn); border-radius: 3px; }
+
+/* ─── Order Picker modal ─── */
+.picker-zoek {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--lijn);
+  border-radius: 7px; font-family: 'Inter', sans-serif; font-size: 13px;
+  outline: none; margin-bottom: 10px; transition: border-color .12s;
+}
+.picker-zoek:focus { border-color: var(--groen-licht); }
+.picker-lijst { max-height: 350px; overflow-y: auto; border: 1px solid var(--lijn); border-radius: 8px; }
+.picker-rij {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-bottom: 1px solid var(--lijn); cursor: pointer; transition: background .1s;
+}
+.picker-rij:last-child { border-bottom: none; }
+.picker-rij:hover { background: var(--groen-zacht); }
+.picker-ref { font-size: 11.5px; font-weight: 700; color: var(--tekst); min-width: 70px; flex: none; }
+.picker-naam { font-size: 12.5px; color: var(--tekst); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-datum { font-size: 11px; color: var(--muted); flex: none; }
 
 .leeg {
   font-size: 11px;
@@ -908,6 +935,25 @@ body {
   </div>
 </div>
 
+<!-- ORDER PICKER MODAL -->
+<div class="modal-achtergrond" id="orderPickerModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hoofd">
+      <div id="pickerType" class="modal-type inkoop">Order koppelen</div>
+      <div id="pickerTitel" class="modal-naam" style="font-size:15px">—</div>
+      <button class="modal-sluiten" onclick="sluitOrderPicker()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="picker-zoek" id="pickerZoek" placeholder="Zoek op ordernummer of naam…" oninput="filterPickerLijst(this.value)" />
+      <div class="picker-lijst" id="pickerLijst">
+        <div style="color:var(--muted);text-align:center;padding:20px">Laden…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- NOTITIE DETAIL MODAL -->
 <div class="modal-achtergrond" id="notitieModal">
   <div class="modal">
@@ -1234,7 +1280,6 @@ async function latVallen(event, nieuweDatum, catType) {
   sleepIdx = null;
 
   if (item.datum === nieuweDatum) return;
-
   if (!verbonden) { toon('Niet verbonden met BC'); return; }
   if (!item._raw?.id) { toon('Order heeft geen ID — niet bij te werken'); return; }
 
@@ -1242,61 +1287,73 @@ async function latVallen(event, nieuweDatum, catType) {
   toon('Datum bijwerken in BC…');
 
   try {
-    // Velden die read-only zijn in BC API
     const readOnly = new Set([
       'id','systemVersion','systemCreatedAt','systemCreatedBy','systemModifiedAt','systemModifiedBy',
       'orderDate','postingDate','lastModifiedDateTime','lastModifiedDatetime','number'
     ]);
 
     if (type === 'inkoop') {
-      // Inkoop: haal volledige order op om extra datumvelden te vinden
-      const endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
-      const volledigePO = await bcGet(endpoint);
+      const ep = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
+      await bcPatch(ep, { requestedReceiptDate: nieuweDatum });
+
+    } else if (type === 'productie') {
+      // Productie = vervaldatum (dueDate). Probeer prdDateVeld (auto-detected).
+      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
       const body = {};
-      // Voeg alle schrijfbare datumvelden toe (ook null-velden met 'date' in de naam)
-      Object.keys(volledigePO).forEach(k => {
-        if (readOnly.has(k)) return;
-        const v = volledigePO[k];
-        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) body[k] = nieuweDatum;
-        else if (v === null && /date/i.test(k)) body[k] = nieuweDatum;
-      });
-      if (!body.requestedReceiptDate) body.requestedReceiptDate = nieuweDatum;
-      console.log('Inkoop PATCH body:', JSON.stringify(body));
-      await bcPatch(endpoint, body);
+      body[prdDateVeld] = nieuweDatum;
+      console.log('Productie PATCH body:', JSON.stringify(body));
+      await bcPatch(ep, body);
 
     } else {
-      // Verkoop: haal volledige order op — ook null-datumvelden zoals "Toegezegde leverdatum"
-      const endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-      const volledigeSO = await bcGet(endpoint);
+      // Transport = Toegezegde leverdatum. Dit veld zit NIET in de standaard BC API.
+      // We halen de volledige order op en sturen ALLE schrijfbare datumvelden mee.
+      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
+      const vol = await bcGet(ep);
+      console.log('Transport — alle velden:', Object.entries(vol).map(([k,v])=>k+'='+JSON.stringify(v)).join(' | '));
       const body = {};
-      Object.keys(volledigeSO).forEach(k => {
+      Object.keys(vol).forEach(k => {
         if (readOnly.has(k)) return;
-        const v = volledigeSO[k];
-        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) body[k] = nieuweDatum;
-        else if (v === null && /date/i.test(k)) body[k] = nieuweDatum;
+        const v = vol[k];
+        // Datumstring-velden
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) { body[k] = nieuweDatum; return; }
+        // Null-velden met 'date' of 'datum' in de naam (bijv. toegezeggeLeverdatum)
+        if (v === null && /date|datum/i.test(k)) { body[k] = nieuweDatum; return; }
       });
       if (!body.requestedDeliveryDate) body.requestedDeliveryDate = nieuweDatum;
-      console.log('Verkoop PATCH body:', JSON.stringify(body));
-      await bcPatch(endpoint, body);
+      console.log('Transport PATCH body:', JSON.stringify(body));
+      try {
+        await bcPatch(ep, body);
+      } catch(patchErr) {
+        // BC blokkeert wijziging van Verzochte leverdatum als Toegezegde leverdatum ingevuld is.
+        // De Toegezegde leverdatum is niet beschikbaar via de standaard BC API v2.0.
+        if (patchErr.message.includes('Toegezegde') || patchErr.message.includes('promised') || patchErr.message.includes('Dialog')) {
+          toon('⚠ Pas de Toegezegde leverdatum handmatig aan in Business Central');
+          console.warn('BC API limiet: Toegezegde leverdatum niet bereikbaar via standaard API. Pas datum aan in BC zelf.');
+          return;
+        }
+        throw patchErr;
+      }
     }
 
     toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
     item.datum = nieuweDatum;
-    if (item._raw) item._raw.requestedDeliveryDate = nieuweDatum;
     teken();
     setTimeout(() => haalData(), 2000);
   } catch(e) {
     console.error('PATCH fout:', e);
-    toon('⚠ ' + e.message.substring(0, 120));
+    toon('⚠ ' + e.message.substring(0, 130));
   }
 }
 
 /* ══════════════════════════════════════
    DATA OPHALEN UIT BC
-   - Inkoop:    inkooporders op expectedReceiptDate
-   - Productie: verkooporders op dueDate (vervaldatum)
-   - Transport: verkooporders op requestedDeliveryDate (toegezegde leverdatum)
+   - Inkoop:    requestedReceiptDate
+   - Productie: dueDate (vervaldatum/productiedatum)
+   - Transport: requestedDeliveryDate (proxy; Toegezegde leverdatum zit niet in standaard API)
 ══════════════════════════════════════ */
+let prdDateVeld = 'requestedDeliveryDate'; // wordt auto-detected
+let trnDateVeld = 'requestedDeliveryDate';
+
 async function haalData() {
   if (!verbonden || !bcBedrijfId) return;
 
@@ -1306,7 +1363,7 @@ async function haalData() {
 
   updateBCKnop('bezig');
   try {
-    // Haal inkooporders op — probeer verschillende datumvelden, zonder expand
+    // ── INKOOP ── requestedReceiptDate
     const poDateVelden = ['requestedReceiptDate','expectedReceiptDate','dueDate','orderDate'];
     let poRes = null;
     for (const veld of poDateVelden) {
@@ -1315,42 +1372,46 @@ async function haalData() {
           `/companies(${bcBedrijfId})/purchaseOrders` +
           `?$filter=${veld} ge ${van} and ${veld} le ${tot}`
         );
-        console.log('Inkooporder datumveld gevonden:', veld);
+        console.log('Inkoop datumveld:', veld);
         break;
       } catch(e) {
-        if (!e.message.includes('Could not find a property')) throw e;
+        if (!e.message.includes('Could not find a property') && !e.message.includes('does not exist on type')) throw e;
       }
     }
     if (!poRes) poRes = { value: [] };
 
-    // Haal verkooporders op voor Productie — filtereer op requestedDeliveryDate (vervaldatum)
+    // ── PRODUCTIE ── dueDate (vervaldatum), fallback requestedDeliveryDate
+    const prdVelden = ['dueDate','requestedDeliveryDate','orderDate'];
     let soPrdRes = null;
+    for (const veld of prdVelden) {
+      try {
+        soPrdRes = await bcGet(
+          `/companies(${bcBedrijfId})/salesOrders` +
+          `?$filter=${veld} ge ${van} and ${veld} le ${tot}`
+        );
+        prdDateVeld = veld;
+        console.log('Productie datumveld:', veld, '→', soPrdRes.value?.length, 'orders');
+        break;
+      } catch(e) {
+        if (!e.message.includes('Could not find a property') && !e.message.includes('does not exist on type')) throw e;
+      }
+    }
+    if (!soPrdRes) soPrdRes = { value: [] };
+
+    // ── TRANSPORT ── requestedDeliveryDate (proxy voor Toegezegde leverdatum)
+    // Toegezegde leverdatum zit NIET in de standaard BC API v2.0.
+    let soTrnRes = null;
     try {
-      soPrdRes = await bcGet(
+      soTrnRes = await bcGet(
         `/companies(${bcBedrijfId})/salesOrders` +
         `?$filter=requestedDeliveryDate ge ${van} and requestedDeliveryDate le ${tot}`
       );
+      trnDateVeld = 'requestedDeliveryDate';
+      console.log('Transport datumveld: requestedDeliveryDate →', soTrnRes.value?.length, 'orders');
     } catch(e) {
-      soPrdRes = { value: [] };
+      soTrnRes = { value: [] };
     }
-    if (!soPrdRes) soPrdRes = { value: [] };
-    console.log('Productie orders gevonden:', soPrdRes.value?.length);
-
-    // Als 0 resultaten met datum filter, haal alle orders op voor debug
-    if (soPrdRes.value?.length === 0) {
-      try {
-        const alleRes = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=5`);
-        if (alleRes?.value?.length > 0) {
-          console.log('DEBUG - sample salesOrder velden:', Object.keys(alleRes.value[0]));
-          console.log('DEBUG - sample order:', JSON.stringify(alleRes.value[0]).substring(0, 500));
-        } else {
-          console.log('DEBUG - geen open verkooporders gevonden in BC');
-        }
-      } catch(e) {}
-    }
-
-    // Transport — zelfde data, maar apart zoeken (kan later ander veld worden)
-    const soTrnRes = soPrdRes;
+    if (!soTrnRes) soTrnRes = { value: [] };
 
     liveData = {
       inkoop:    verwerkInkoop(poRes),
@@ -1389,17 +1450,16 @@ function verwerkInkoop(res) {
 function verwerkProductie(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    // Vervaldatum = requestedDeliveryDate (beschikbaar in deze omgeving)
-    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    const datum = (so[prdDateVeld] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
-      ref:         so.number,
-      klant:       so.customerName || so.customerNumber || '—',
-      artikel:     '',
-      hoeveelheid: '',
-      orderdatum:  (so.orderDate || '').substring(0,10),
-      _raw:        so
+      ref:        so.number,
+      klant:      so.customerName || so.customerNumber || '—',
+      artikel:    '',
+      hoeveelheid:'',
+      orderdatum: (so.orderDate || '').substring(0,10),
+      _raw:       so
     });
   });
   return uit;
@@ -1408,17 +1468,15 @@ function verwerkProductie(res) {
 function verwerkTransport(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    // Toegezegde leverdatum = requestedDeliveryDate
     const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
-      ref:         so.number,
-      klant:       so.customerName || so.customerNumber || '—',
-      artikel:     '',
-      hoeveelheid: '',
-      vervaldatum: datum,
-      _raw:        so
+      ref:        so.number,
+      klant:      so.customerName || so.customerNumber || '—',
+      artikel:    '',
+      hoeveelheid:'',
+      _raw:       so
     });
   });
   return uit;
@@ -1590,7 +1648,10 @@ function teken() {
         ondragover="sleepOver(event)"
         ondragleave="sleepWeg(event)"
         ondrop="latVallen(event,'${ds}','${cat.key}')">
-        <div class="cat-label ${cat.key}">${cat.label}</div>
+        <div class="cat-label ${cat.key}" style="display:flex;justify-content:space-between;align-items:center">
+          <span>${cat.label}</span>
+          ${verbonden ? `<button class="cat-plus-btn" onclick="openOrderPicker('${ds}','${cat.key}')" title="Order koppelen aan deze dag">+</button>` : ''}
+        </div>
         <div class="cat-body">${rijen}</div>
       </div>`;
     });
@@ -1744,6 +1805,126 @@ function sluitNotitieModal() {
 }
 
 /* ══════════════════════════════════════
+   ORDER PICKER — koppel order aan datum
+══════════════════════════════════════ */
+let _pickerDatum = null;
+let _pickerType  = null;
+let _pickerAlleOrders = [];
+
+async function openOrderPicker(datum, type) {
+  _pickerDatum = datum;
+  _pickerType  = type;
+
+  const labels = { inkoop:'Inkooporder', productie:'Verkooporder (Productie)', transport:'Verkooporder (Transport)' };
+  const d = new Date(datum + 'T00:00:00');
+  const datumStr = DAGAMEN_arr()[d.getDay()] + ' ' + d.getDate() + ' ' + MAANDNAMEN[d.getMonth()];
+
+  const badge = document.getElementById('pickerType');
+  badge.className = 'modal-type ' + (type === 'inkoop' ? 'inkoop' : type === 'productie' ? 'productie' : 'transport');
+  badge.textContent = labels[type] || type;
+  document.getElementById('pickerTitel').textContent = 'Koppelen aan ' + datumStr;
+  document.getElementById('pickerZoek').value = '';
+  document.getElementById('pickerLijst').innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Laden…</div>';
+  document.getElementById('orderPickerModal').classList.add('open');
+
+  try {
+    if (type === 'inkoop') {
+      const res = await bcGet(`/companies(${bcBedrijfId})/purchaseOrders?$top=200`);
+      _pickerAlleOrders = (res.value || []).map(po => ({
+        id:    po.id,
+        ref:   po.number || '—',
+        naam:  po.vendorName || po.vendorNumber || '—',
+        datum: (po.requestedReceiptDate || po.expectedReceiptDate || po.orderDate || '').substring(0,10),
+        _raw:  po
+      }));
+    } else {
+      const res = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=200`);
+      _pickerAlleOrders = (res.value || []).map(so => ({
+        id:    so.id,
+        ref:   so.number || '—',
+        naam:  so.customerName || so.customerNumber || '—',
+        datum: (so.requestedDeliveryDate || so.orderDate || '').substring(0,10),
+        _raw:  so
+      }));
+    }
+    toonPickerLijst(_pickerAlleOrders);
+  } catch(e) {
+    document.getElementById('pickerLijst').innerHTML =
+      `<div style="color:var(--rood);padding:12px">Fout: ${esc(e.message.substring(0,120))}</div>`;
+  }
+}
+
+function toonPickerLijst(lijst) {
+  if (!lijst.length) {
+    document.getElementById('pickerLijst').innerHTML =
+      '<div style="color:var(--muted);text-align:center;padding:20px">Geen orders gevonden</div>';
+    return;
+  }
+  document.getElementById('pickerLijst').innerHTML = lijst.map(o => `
+    <div class="picker-rij" onclick="kiesOrder('${o.id}','${esc(o.ref)}','${esc(o.naam).replace(/'/g,"\\'")}')">
+      <div class="picker-ref">${esc(o.ref)}</div>
+      <div class="picker-naam">${esc(o.naam)}</div>
+      <div class="picker-datum">${o.datum ? fDatum(o.datum) : 'Geen datum'}</div>
+    </div>`).join('');
+}
+
+function filterPickerLijst(zoek) {
+  if (!zoek) { toonPickerLijst(_pickerAlleOrders); return; }
+  const z = zoek.toLowerCase();
+  toonPickerLijst(_pickerAlleOrders.filter(o =>
+    o.ref.toLowerCase().includes(z) || o.naam.toLowerCase().includes(z)
+  ));
+}
+
+async function kiesOrder(orderId, ref, naam) {
+  document.getElementById('orderPickerModal').classList.remove('open');
+  toon('Datum instellen in BC…');
+  try {
+    if (_pickerType === 'inkoop') {
+      await bcPatch(`/companies(${bcBedrijfId})/purchaseOrders(${orderId})`,
+        { requestedReceiptDate: _pickerDatum });
+
+    } else if (_pickerType === 'productie') {
+      const body = {};
+      body[prdDateVeld] = _pickerDatum;
+      await bcPatch(`/companies(${bcBedrijfId})/salesOrders(${orderId})`, body);
+
+    } else {
+      // Transport — probeer alle datumvelden meesturen
+      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
+      const vol = await bcGet(ep);
+      const readOnly = new Set(['id','systemVersion','systemCreatedAt','systemCreatedBy',
+        'systemModifiedAt','systemModifiedBy','orderDate','postingDate','lastModifiedDateTime','lastModifiedDatetime','number']);
+      const body = {};
+      Object.keys(vol).forEach(k => {
+        if (readOnly.has(k)) return;
+        const v = vol[k];
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) body[k] = _pickerDatum;
+        else if (v === null && /date|datum/i.test(k)) body[k] = _pickerDatum;
+      });
+      if (!body.requestedDeliveryDate) body.requestedDeliveryDate = _pickerDatum;
+      try {
+        await bcPatch(ep, body);
+      } catch(pErr) {
+        if (pErr.message.includes('Toegezegde') || pErr.message.includes('Dialog')) {
+          toon('⚠ Pas de Toegezegde leverdatum handmatig aan in Business Central');
+          return;
+        }
+        throw pErr;
+      }
+    }
+    toon('✓ ' + ref + ' ingepland op ' + fDatum(_pickerDatum));
+    setTimeout(() => haalData(), 1200);
+  } catch(e) {
+    toon('⚠ ' + e.message.substring(0, 130));
+  }
+}
+
+function sluitOrderPicker() {
+  document.getElementById('orderPickerModal').classList.remove('open');
+}
+
+/* ══════════════════════════════════════
    DETAIL MODAL
 ══════════════════════════════════════ */
 function rij(label, waarde, groot) {
@@ -1879,8 +2060,9 @@ function sluitModal() { document.getElementById('modal').classList.remove('open'
 document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') sluitModal(); });
 document.getElementById('notitieModal').addEventListener('click', e => { if (e.target.id === 'notitieModal') sluitNotitieModal(); });
 document.getElementById('notitieNieuwModal').addEventListener('click', e => { if (e.target.id === 'notitieNieuwModal') sluitNieuwNotitie(); });
+document.getElementById('orderPickerModal').addEventListener('click', e => { if (e.target.id === 'orderPickerModal') sluitOrderPicker(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { sluitModal(); sluitNotitieModal(); sluitNieuwNotitie(); }
+  if (e.key === 'Escape') { sluitModal(); sluitNotitieModal(); sluitNieuwNotitie(); sluitOrderPicker(); }
 });
 
 /* ══════════════════════════════════════
