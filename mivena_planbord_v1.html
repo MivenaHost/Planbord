@@ -285,44 +285,78 @@ body {
 .tl-scroll::-webkit-scrollbar-track { background: var(--groen-zacht); border-radius: 10px; }
 .tl-scroll::-webkit-scrollbar-thumb { background: var(--groen-licht); border-radius: 10px; }
 
+/* Tijdlijn = flex column van rijen */
 .tijdlijn {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
   min-width: 850px;
   flex: 1;
+}
+
+/* Elke rij = grid met dezelfde kolomindeling */
+.tl-rij {
+  display: grid;
+  grid-template-columns: var(--tl-cols, repeat(5, minmax(160px, 1fr)) 48px);
+  column-gap: 8px;
   align-items: stretch;
 }
 
-/* ═══════════════════════════════════════
-   DAG KAART
-═══════════════════════════════════════ */
-.dag-kaart {
-  background: var(--wit);
-  border-radius: 12px;
-  border: 1px solid var(--lijn);
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-}
-.dag-kaart.vandaag {
-  border-color: var(--groen-licht);
-  box-shadow: 0 0 0 1px var(--groen-licht), 0 4px 12px rgba(27,67,50,.2);
-}
-.dag-kaart.weekend { background: #F4F7F2; border-color: #E4EBE0; }
-
-.dag-hoofd {
+/* Dag-header cel (bovenste stuk per kolom) */
+.tl-dag-hoofd {
   padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--lijn);
+  border: 1px solid var(--lijn);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  background: var(--bg);
   text-align: center;
   position: relative;
 }
-.dag-kaart.vandaag .dag-hoofd {
+.tl-dag-hoofd.vandaag {
   background: linear-gradient(135deg, var(--groen), var(--groen-dark));
+  border-color: var(--groen-licht);
+  box-shadow: -1px 0 0 var(--groen-licht), 1px 0 0 var(--groen-licht);
 }
-.dag-kaart.weekend .dag-hoofd { background: #EDF2EA; }
+.tl-dag-hoofd.weekend { background: #EDF2EA; }
+.tl-dag-hoofd.vandaag .dag-naam  { color: rgba(235,244,238,.7); }
+.tl-dag-hoofd.vandaag .dag-datum { color: #fff; }
+.tl-dag-hoofd.vandaag .dag-maand { color: rgba(235,244,238,.5); }
 
+/* Categorie cel (midden) */
+.tl-cat-cel {
+  background: var(--wit);
+  border-left: 1px solid var(--lijn);
+  border-right: 1px solid var(--lijn);
+  border-top: 1px solid var(--lijn);
+  display: flex;
+  flex-direction: column;
+}
+.tl-cat-cel.vandaag {
+  border-left-color: var(--groen-licht);
+  border-right-color: var(--groen-licht);
+}
+.tl-cat-cel.weekend { background: #F4F7F2; }
+
+/* Notitie cel (onderste stuk per kolom) */
+.tl-not-cel {
+  background: var(--wit);
+  border: 1px solid var(--lijn);
+  border-top: 1px solid var(--lijn);
+  border-radius: 0 0 12px 12px;
+  padding: 7px 11px 9px;
+  display: flex;
+  flex-direction: column;
+}
+.tl-not-cel.vandaag {
+  border-color: var(--groen-licht);
+  border-top-color: var(--lijn);
+}
+.tl-not-cel.weekend { background: #F4F7F2; }
+
+/* Lege cel (onder weekend knop) */
+.tl-lege-cel { /* placeholder */ }
+
+/* Dag labels (gebruikt in tl-dag-hoofd) */
+.dag-hoofd { /* legacy, niet meer in gebruik */ }
 .dag-naam {
   font-size: 9px;
   font-weight: 700;
@@ -331,8 +365,6 @@ body {
   color: var(--muted);
   margin-bottom: 2px;
 }
-.dag-kaart.vandaag .dag-naam { color: rgba(235,244,238,.7); }
-
 .dag-datum {
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
@@ -340,10 +372,7 @@ body {
   line-height: 1;
   color: var(--groen-dark);
 }
-.dag-kaart.vandaag .dag-datum { color: #fff; }
-
 .dag-maand { font-size: 10px; color: var(--muted); margin-top: 1px; }
-.dag-kaart.vandaag .dag-maand { color: rgba(235,244,238,.5); }
 
 .vandaag-pip {
   position: absolute;
@@ -464,10 +493,8 @@ body {
 /* ═══════════════════════════════════════
    NOTITIE
 ═══════════════════════════════════════ */
-.notitie-sec {
-  border-top: 1px solid var(--lijn);
+.notitie-sec, .tl-not-cel {
   padding: 7px 11px 9px;
-  flex: none;
 }
 .notitie-label {
   font-size: 9px;
@@ -1231,112 +1258,96 @@ function teken() {
   document.getElementById('totTransport').textContent =
     `${(kgTrn/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wTrn.length}`;
 
-  // Grid kolommen
+  // Rij-gebaseerde layout: elke categorie is een horizontale rij
   const tl = document.getElementById('tijdlijn');
   const kolommen = weekendOpen ? 7 : 5;
-  tl.style.gridTemplateColumns = `repeat(${kolommen}, minmax(160px, 1fr)) 48px`;
+  const dagLijst = weekendOpen ? dagen : dagen.slice(0, 5);
+  tl.style.setProperty('--tl-cols', `repeat(${kolommen}, minmax(160px, 1fr)) 48px`);
   tl.style.minWidth = weekendOpen ? '1240px' : '880px';
 
-  let html = '';
-  dagen.slice(0,5).forEach(d => {
-    html += dagKolom(d, srcInkoop, srcProductie, srcTransport);
+  function cls(d) {
+    const ds = iso(d);
+    const v = ds === iso(VANDAAG);
+    const w = isWeekend(d);
+    return { ds, v, w, extra: (v?' vandaag':'') + (w?' weekend':'') };
+  }
+
+  const wkndKnop = weekendOpen
+    ? `<div class="weekend-blok" onclick="toggleWeekend()" title="Weekend verbergen">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="weekend-tekst">Za + Zo</span>
+       </div>`
+    : `<div class="weekend-blok" onclick="toggleWeekend()" title="Weekend tonen">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="weekend-tekst">Za + Zo</span>
+       </div>`;
+
+  // RIJ 1: dag-headers
+  let html = `<div class="tl-rij">`;
+  dagLijst.forEach(d => {
+    const {ds, v, w, extra} = cls(d);
+    html += `<div class="tl-dag-hoofd${extra}">
+      ${v ? '<span class="vandaag-pip">Vandaag</span>' : ''}
+      <div class="dag-naam">${DAGAMEN(d.getDay())}</div>
+      <div class="dag-datum">${d.getDate()}</div>
+      <div class="dag-maand">${MAANDNAMEN[d.getMonth()]}</div>
+    </div>`;
+  });
+  html += wkndKnop + `</div>`;
+
+  // RIJEN 2-4: categorie-rijen (inkoop, productie, transport)
+  const cats = [
+    { key:'inkoop',    src:srcInkoop,    label:`${ICO_INKOOP}Inkoop`,    leeg:'Geen aanvoer'  },
+    { key:'productie', src:srcProductie, label:`${ICO_PROD}Productie`,   leeg:'Geen productie'},
+    { key:'transport', src:srcTransport, label:`${ICO_TRANS}Transport`,  leeg:'Geen transport'},
+  ];
+  cats.forEach(cat => {
+    html += `<div class="tl-rij">`;
+    dagLijst.forEach(d => {
+      const {ds, v, w, extra} = cls(d);
+      const items = cat.src.filter(x => x.datum === ds);
+      const rijen = items.length
+        ? items.map(item => {
+            const i = bewaar({type: cat.key, item, d});
+            const naam = cat.key === 'inkoop' ? (item.leverancier||'—') : (item.klant||'—');
+            return `<div class="item ${cat.key}" onclick="toonDetail(${i})">
+              <div class="item-naam">${esc(naam)}</div>
+              <div class="item-sub">${esc(item.ref||'—')}</div>
+            </div>`;
+          }).join('')
+        : `<div class="leeg">${verbonden ? 'Geen orders in BC' : cat.leeg}</div>`;
+      html += `<div class="tl-cat-cel ${cat.key}${extra}">
+        <div class="cat-label ${cat.key}">${cat.label}</div>
+        <div class="cat-body">${rijen}</div>
+      </div>`;
+    });
+    html += `<div class="tl-lege-cel"></div></div>`;
   });
 
-  if (!weekendOpen) {
-    html += `<div class="weekend-blok" onclick="toggleWeekend()" title="Weekend tonen">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="weekend-tekst">Za + Zo</span>
+  // RIJ 5: notities
+  html += `<div class="tl-rij">`;
+  dagLijst.forEach(d => {
+    const {ds, v, w, extra} = cls(d);
+    const notitie = notities[ds] || null;
+    const notTekst = notitie ? esc(notitie.tekst) : '';
+    const notitieInfo = notitie
+      ? `<div class="notitie-info" id="ni-${ds}">
+           <span class="notitie-init">${notitie.init}</span>
+           <span class="notitie-tijd">${notitie.tijdstip}</span>
+         </div>`
+      : `<div class="notitie-info" id="ni-${ds}" style="display:none"></div>`;
+    html += `<div class="tl-not-cel${extra}">
+      <div class="notitie-label">${ICO_PEN}Notitie</div>
+      <textarea class="notitie-veld" id="nt-${ds}"
+        placeholder="Voeg een notitie toe…"
+        onblur="slaNotitieOp('${ds}')">${notTekst}</textarea>
+      ${notitieInfo}
+      <div class="opgeslagen-ind" id="oi-${ds}">✓ Opgeslagen</div>
     </div>`;
-  } else {
-    dagen.slice(5).forEach(d => { html += dagKolom(d, srcInkoop, srcProductie, srcTransport); });
-    html += `<div class="weekend-blok" onclick="toggleWeekend()" title="Weekend verbergen">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="weekend-tekst">Za + Zo</span>
-    </div>`;
-  }
+  });
+  html += `<div class="tl-lege-cel"></div></div>`;
+
   tl.innerHTML = html;
-}
-
-/* ═══════════════════════════════════
-   DAG KOLOM HTML
-═══════════════════════════════════ */
-function dagKolom(d, srcInk, srcPrd, srcTrn) {
-  const ds       = iso(d);
-  const isVandaag = ds === iso(VANDAAG);
-  const isWknd   = isWeekend(d);
-
-  const inkItems = srcInk.filter(x => x.datum === ds);
-  const prdItems = srcPrd.filter(x => x.datum === ds);
-  const trnItems = srcTrn.filter(x => x.datum === ds);
-
-  const inkRijen = inkItems.length
-    ? inkItems.map(item => {
-        const i = bewaar({type:'inkoop', item, d});
-        return `<div class="item inkoop" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.leverancier||'—')}</div>
-          <div class="item-sub">${esc(item.ref||'—')}</div>
-        </div>`;
-      }).join('')
-    : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen aanvoer'}</div>`;
-
-  const prdRijen = prdItems.length
-    ? prdItems.map(item => {
-        const i = bewaar({type:'productie', item, d});
-        return `<div class="item productie" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.klant||'—')}</div>
-          <div class="item-sub">${esc(item.ref||'—')}</div>
-        </div>`;
-      }).join('')
-    : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen productie'}</div>`;
-
-  const trnRijen = trnItems.length
-    ? trnItems.map(item => {
-        const i = bewaar({type:'transport', item, d});
-        return `<div class="item transport" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.klant||'—')}</div>
-          <div class="item-sub">${esc(item.ref||'—')}</div>
-        </div>`;
-      }).join('')
-    : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen transport'}</div>`;
-
-  const notitie   = notities[ds] || null;
-  const notTekst  = notitie ? esc(notitie.tekst) : '';
-  const notitieInfo = notitie
-    ? `<div class="notitie-info" id="ni-${ds}">
-         <span class="notitie-init">${notitie.init}</span>
-         <span class="notitie-tijd">${notitie.tijdstip}</span>
-       </div>`
-    : `<div class="notitie-info" id="ni-${ds}" style="display:none"></div>`;
-
-  return `
-    <div class="dag-kaart${isVandaag?' vandaag':''}${isWknd?' weekend':''}">
-      <div class="dag-hoofd">
-        ${isVandaag ? '<span class="vandaag-pip">Vandaag</span>' : ''}
-        <div class="dag-naam">${DAGAMEN(d.getDay())}</div>
-        <div class="dag-datum">${d.getDate()}</div>
-        <div class="dag-maand">${MAANDNAMEN[d.getMonth()]}</div>
-      </div>
-      <div class="cat-sec">
-        <div class="cat-label inkoop">${ICO_INKOOP}Inkoop</div>
-        <div class="cat-body">${inkRijen}</div>
-      </div>
-      <div class="cat-sec">
-        <div class="cat-label productie">${ICO_PROD}Productie</div>
-        <div class="cat-body">${prdRijen}</div>
-      </div>
-      <div class="cat-sec">
-        <div class="cat-label transport">${ICO_TRANS}Transport</div>
-        <div class="cat-body">${trnRijen}</div>
-      </div>
-      <div class="notitie-sec">
-        <div class="notitie-label">${ICO_PEN}Notitie</div>
-        <textarea class="notitie-veld" id="nt-${ds}"
-          placeholder="Voeg een notitie toe…"
-          onblur="slaNotitieOp('${ds}')">${notTekst}</textarea>
-        ${notitieInfo}
-        <div class="opgeslagen-ind" id="oi-${ds}">✓ Opgeslagen</div>
-      </div>
-    </div>`;
 }
 
 function DAGAMEN(n) { return DAGAMEN._d ? DAGAMEN._d[n] : (DAGAMEN._d = DAGAMEN_arr())[n]; }
