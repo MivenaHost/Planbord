@@ -957,19 +957,16 @@ async function haalData() {
       `&$expand=purchaseOrderLines`
     );
 
-    // Haal verkooporders op voor productie (datum = dueDate = Vervaldatum)
+    // Haal verkooporders op voor productie (datum = shipmentDate = Verzenddatum/Vervaldatum)
     const soPrdRes = await bcGet(
       `/companies(${bcBedrijfId})/salesOrders` +
-      `?$filter=dueDate ge ${van} and dueDate le ${tot}` +
+      `?$filter=shipmentDate ge ${van} and shipmentDate le ${tot}` +
       `&$expand=salesOrderLines`
     );
 
-    // Haal verkooporders op voor transport (datum = requestedDeliveryDate = Toegezegde leverdatum)
-    const soTrnRes = await bcGet(
-      `/companies(${bcBedrijfId})/salesOrders` +
-      `?$filter=requestedDeliveryDate ge ${van} and requestedDeliveryDate le ${tot}` +
-      `&$expand=salesOrderLines`
-    );
+    // Haal verkooporders op voor transport (datum = shipmentDate, gefilterd op leveringsdatum)
+    // Zelfde veld gebruiken — transport toont orders op verzenddatum
+    const soTrnRes = soPrdRes;
 
     liveData = {
       inkoop:    verwerkInkoop(poRes),
@@ -1011,7 +1008,7 @@ function verwerkProductie(res) {
     (so.salesOrderLines?.value || []).forEach(r => {
       if (!['Item','item'].includes(r.lineType)) return;
       uit.push({
-        datum:    (so.dueDate || '').substring(0,10),
+        datum:    (so.shipmentDate || so.orderDate || '').substring(0,10),
         ref:      so.number,
         klant:    so.customerName,
         artikel:  r.description || r.itemId,
@@ -1029,12 +1026,12 @@ function verwerkTransport(res) {
     (so.salesOrderLines?.value || []).forEach(r => {
       if (!['Item','item'].includes(r.lineType)) return;
       uit.push({
-        datum:    (so.requestedDeliveryDate || '').substring(0,10),
+        datum:    (so.shipmentDate || so.orderDate || '').substring(0,10),
         ref:      so.number,
         klant:    so.customerName,
         artikel:  r.description || r.itemId,
         hoeveelheid: r.quantity || 0,
-        vervaldatum: (so.dueDate || '').substring(0,10)
+        vervaldatum: (so.shipmentDate || '').substring(0,10)
       });
     });
   });
