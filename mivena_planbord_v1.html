@@ -275,9 +275,11 @@ body {
 .tl-scroll {
   flex: 1;
   overflow: auto;
-  padding: 16px 16px 32px;
+  padding: 12px 16px 12px;
   scrollbar-width: thin;
   scrollbar-color: var(--groen-licht) var(--groen-zacht);
+  display: flex;
+  flex-direction: column;
 }
 .tl-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
 .tl-scroll::-webkit-scrollbar-track { background: var(--groen-zacht); border-radius: 10px; }
@@ -287,6 +289,8 @@ body {
   display: grid;
   gap: 8px;
   min-width: 850px;
+  flex: 1;
+  align-items: stretch;
 }
 
 /* ═══════════════════════════════════════
@@ -300,6 +304,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 100%;
 }
 .dag-kaart.vandaag {
   border-color: var(--groen-licht);
@@ -438,8 +443,8 @@ body {
 .item.transport { border-left-color: var(--groen-licht); }
 
 .item-naam {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--tekst);
   white-space: nowrap;
   overflow: hidden;
@@ -453,6 +458,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 1px;
+  font-weight: 500;
 }
 
 /* ═══════════════════════════════════════
@@ -555,10 +561,13 @@ body {
 .modal {
   background: var(--wit);
   border-radius: 15px;
-  max-width: 400px;
+  max-width: 680px;
   width: 100%;
+  max-height: 90vh;
   box-shadow: 0 20px 50px rgba(0,0,0,.35);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   animation: in .16s ease;
 }
 @keyframes in { from{opacity:0;transform:translateY(10px) scale(.97)} to{opacity:1;transform:none} }
@@ -595,7 +604,11 @@ body {
 .modal-sluiten:hover { background: var(--lijn); }
 .modal-sluiten svg { width: 13px; height: 13px; }
 
-.modal-body { padding: 14px 20px 18px; }
+.modal-body {
+  padding: 14px 20px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
 .rij {
   display: flex;
   justify-content: space-between;
@@ -606,9 +619,62 @@ body {
   font-size: 13px;
 }
 .rij:last-child { border-bottom: none; padding-bottom: 0; }
-.rij-label { color: var(--muted); font-weight: 500; min-width: 110px; flex: none; }
+.rij-label { color: var(--muted); font-weight: 500; min-width: 150px; flex: none; }
 .rij-waarde { font-weight: 600; color: var(--tekst); text-align: right; }
 .rij-waarde.groot { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 700; color: var(--groen-dark); }
+
+.detail-knop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: var(--groen-zacht);
+  border: 1px solid var(--groen-licht);
+  border-radius: 9px;
+  color: var(--groen-mid);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: background .12s;
+}
+.detail-knop:hover { background: #C0EBD0; }
+.detail-knop svg { width: 15px; height: 15px; flex: none; }
+
+.regels-sectie { margin-top: 14px; }
+.regels-titel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+  border-top: 1px solid var(--lijn);
+  padding-top: 12px;
+}
+.regels-tabel {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.regels-tabel th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 10.5px;
+  padding: 5px 6px;
+  border-bottom: 2px solid var(--lijn);
+}
+.regels-tabel td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--lijn);
+  color: var(--tekst);
+  vertical-align: top;
+}
+.regels-tabel tr:last-child td { border-bottom: none; }
+.regels-tabel .num { text-align: right; font-weight: 600; }
+.regels-laadbericht { color: var(--muted); font-size: 12px; padding: 10px 0; text-align: center; }
 
 /* ═══════════════════════════════════════
    TOAST
@@ -1022,8 +1088,9 @@ function verwerkInkoop(res) {
       datum,
       ref:         po.number,
       leverancier: po.vendorName || po.vendorNumber || '—',
-      artikel:     po.vendorName ? '' : '—',
-      hoeveelheid: ''
+      artikel:     '',
+      hoeveelheid: '',
+      _raw:        po
     });
   });
   return uit;
@@ -1041,7 +1108,8 @@ function verwerkProductie(res) {
       klant:       so.customerName || so.customerNumber || '—',
       artikel:     '',
       hoeveelheid: '',
-      orderdatum:  (so.orderDate || '').substring(0,10)
+      orderdatum:  (so.orderDate || '').substring(0,10),
+      _raw:        so
     });
   });
   return uit;
@@ -1059,7 +1127,8 @@ function verwerkTransport(res) {
       klant:       so.customerName || so.customerNumber || '—',
       artikel:     '',
       hoeveelheid: '',
-      vervaldatum: datum
+      vervaldatum: datum,
+      _raw:        so
     });
   });
   return uit;
@@ -1204,8 +1273,8 @@ function dagKolom(d, srcInk, srcPrd, srcTrn) {
     ? inkItems.map(item => {
         const i = bewaar({type:'inkoop', item, d});
         return `<div class="item inkoop" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.artikel||'—')}</div>
-          <div class="item-sub">${esc(item.leverancier||'—')} · ${fKg(item.hoeveelheid)}</div>
+          <div class="item-naam">${esc(item.leverancier||'—')}</div>
+          <div class="item-sub">${esc(item.ref||'—')}</div>
         </div>`;
       }).join('')
     : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen aanvoer'}</div>`;
@@ -1214,8 +1283,8 @@ function dagKolom(d, srcInk, srcPrd, srcTrn) {
     ? prdItems.map(item => {
         const i = bewaar({type:'productie', item, d});
         return `<div class="item productie" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.artikel||'—')}</div>
-          <div class="item-sub">${esc(item.klant||'—')} · ${fKg(item.hoeveelheid)}</div>
+          <div class="item-naam">${esc(item.klant||'—')}</div>
+          <div class="item-sub">${esc(item.ref||'—')}</div>
         </div>`;
       }).join('')
     : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen productie'}</div>`;
@@ -1224,8 +1293,8 @@ function dagKolom(d, srcInk, srcPrd, srcTrn) {
     ? trnItems.map(item => {
         const i = bewaar({type:'transport', item, d});
         return `<div class="item transport" onclick="toonDetail(${i})">
-          <div class="item-naam">${esc(item.artikel||'—')}</div>
-          <div class="item-sub">${esc(item.klant||'—')} · ${fKg(item.hoeveelheid)}</div>
+          <div class="item-naam">${esc(item.klant||'—')}</div>
+          <div class="item-sub">${esc(item.ref||'—')}</div>
         </div>`;
       }).join('')
     : `<div class="leeg">${verbonden ? 'Geen orders in BC' : 'Geen transport'}</div>`;
@@ -1309,40 +1378,135 @@ function slaNotitieOp(ds) {
 /* ══════════════════════════════════════
    DETAIL MODAL
 ══════════════════════════════════════ */
+function rij(label, waarde, groot) {
+  if (!waarde && waarde !== 0) return '';
+  return `<div class="rij"><span class="rij-label">${label}</span><span class="rij-waarde${groot?' groot':''}">${waarde}</span></div>`;
+}
+
 function toonDetail(idx) {
   const {type, item, d} = opslag[idx];
+  const r = item._raw || {};
   const datumStr = `${DAGAMEN_arr()[d.getDay()].toLowerCase()} ${d.getDate()} ${MAANDNAMEN[d.getMonth()]} ${d.getFullYear()}`;
+
   const badge = document.getElementById('modalType');
   badge.className = 'modal-type ' + type;
   badge.textContent = {inkoop:'Inkoop',productie:'Productie',transport:'Transport'}[type];
-  document.getElementById('modalNaam').textContent  = item.artikel || '—';
+
+  const hoofdNaam = type === 'inkoop' ? (item.leverancier || '—') : (item.klant || '—');
+  document.getElementById('modalNaam').textContent  = hoofdNaam;
   document.getElementById('modalDatum').textContent = datumStr;
 
   let rijen = '';
   if (type === 'inkoop') {
-    rijen = `
-      <div class="rij"><span class="rij-label">Ordernummer</span><span class="rij-waarde">${esc(item.ref)}</span></div>
-      <div class="rij"><span class="rij-label">Leverancier</span><span class="rij-waarde">${esc(item.leverancier)}</span></div>
-      <div class="rij"><span class="rij-label">Hoeveelheid</span><span class="rij-waarde groot">${fKg(item.hoeveelheid)}</span></div>
-      <div class="rij"><span class="rij-label">Verwachte ontvangst</span><span class="rij-waarde">${fDatum(item.datum)}</span></div>`;
-  } else if (type === 'productie') {
-    rijen = `
-      <div class="rij"><span class="rij-label">Ordernummer</span><span class="rij-waarde">${esc(item.ref)}</span></div>
-      <div class="rij"><span class="rij-label">Klant</span><span class="rij-waarde">${esc(item.klant)}</span></div>
-      <div class="rij"><span class="rij-label">Hoeveelheid</span><span class="rij-waarde groot">${fKg(item.hoeveelheid)}</span></div>
-      <div class="rij"><span class="rij-label">Vervaldatum</span><span class="rij-waarde">${fDatum(item.datum)}</span></div>
-      ${item.orderdatum ? `<div class="rij"><span class="rij-label">Orderdatum</span><span class="rij-waarde">${fDatum(item.orderdatum)}</span></div>` : ''}`;
+    rijen += rij('Ordernummer',          esc(r.number || item.ref));
+    rijen += rij('Leverancier',          esc(r.vendorName));
+    rijen += rij('Leveranciersnummer',   esc(r.vendorNumber));
+    rijen += rij('Status',               esc(r.status));
+    rijen += rij('Orderdatum',           fDatum((r.orderDate||'').substring(0,10)));
+    rijen += rij('Boekingsdatum',        fDatum((r.postingDate||'').substring(0,10)));
+    rijen += rij('Verw. ontvangstdatum', fDatum((r.requestedReceiptDate || r.expectedReceiptDate || r.dueDate || '').substring(0,10)));
+    rijen += rij('Extern documentnr.',   esc(r.externalDocumentNumber));
+    rijen += rij('Valuta',               esc(r.currencyCode));
+    rijen += rij('Totaal excl. BTW',     r.totalAmountExcludingTax != null ? '€ ' + r.totalAmountExcludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null);
+    rijen += rij('BTW',                  r.totalTaxAmount != null ? '€ ' + r.totalTaxAmount.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null);
+    rijen += rij('Totaal incl. BTW',     r.totalAmountIncludingTax != null ? '€ ' + r.totalAmountIncludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null, true);
   } else {
-    rijen = `
-      <div class="rij"><span class="rij-label">Ordernummer</span><span class="rij-waarde">${esc(item.ref)}</span></div>
-      <div class="rij"><span class="rij-label">Klant</span><span class="rij-waarde">${esc(item.klant)}</span></div>
-      <div class="rij"><span class="rij-label">Hoeveelheid</span><span class="rij-waarde groot">${fKg(item.hoeveelheid)}</span></div>
-      <div class="rij"><span class="rij-label">Toegezegde leverdatum</span><span class="rij-waarde">${fDatum(item.datum)}</span></div>
-      ${item.vervaldatum ? `<div class="rij"><span class="rij-label">Vervaldatum (productie)</span><span class="rij-waarde">${fDatum(item.vervaldatum)}</span></div>` : ''}`;
+    rijen += rij('Ordernummer',          esc(r.number || item.ref));
+    rijen += rij('Klantnaam',            esc(r.customerName));
+    rijen += rij('Klantnummer',          esc(r.customerNumber));
+    rijen += rij('Status',               esc(r.status));
+    rijen += rij('Orderdatum',           fDatum((r.orderDate||'').substring(0,10)));
+    rijen += rij('Boekingsdatum',        fDatum((r.postingDate||'').substring(0,10)));
+    rijen += rij('Vervaldatum',          fDatum((r.requestedDeliveryDate||'').substring(0,10)));
+    rijen += rij('Toegezegde leverdatum',fDatum((r.promisedDeliveryDate||'').substring(0,10)));
+    rijen += rij('Extern documentnr.',   esc(r.externalDocumentNumber));
+    rijen += rij('Verkoper',             esc(r.salesperson));
+    rijen += rij('Levermethode',         esc(r.shipmentMethodCode || r.shipmentMethodId));
+    rijen += rij('Afleveradres',         r.shipToName ? esc(r.shipToName) + (r.shipToCity ? ', ' + esc(r.shipToCity) : '') : null);
+    rijen += rij('Valuta',               esc(r.currencyCode));
+    rijen += rij('Totaal excl. BTW',     r.totalAmountExcludingTax != null ? '€ ' + r.totalAmountExcludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null);
+    rijen += rij('BTW',                  r.totalTaxAmount != null ? '€ ' + r.totalTaxAmount.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null);
+    rijen += rij('Totaal incl. BTW',     r.totalAmountIncludingTax != null ? '€ ' + r.totalAmountIncludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null, true);
   }
-  document.getElementById('modalBody').innerHTML = rijen;
+
+  const orderId = r.id || null;
+  const detailKnop = orderId && verbonden ? `
+    <button class="detail-knop" onclick="haalOrderRegels('${orderId}', '${type}')">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Gedetailleerde informatie — orderregels ophalen
+    </button>
+    <div id="regelsSectie"></div>
+  ` : '';
+
+  document.getElementById('modalBody').innerHTML = rijen + detailKnop;
   document.getElementById('modal').classList.add('open');
 }
+
+async function haalOrderRegels(orderId, type) {
+  const sectie = document.getElementById('regelsSectie');
+  if (!sectie) return;
+  sectie.innerHTML = `<div class="regels-laadbericht">Orderregels ophalen...</div>`;
+
+  try {
+    let endpoint, labelCol;
+    if (type === 'inkoop') {
+      endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})/purchaseOrderLines`;
+      labelCol = 'Artikel';
+    } else {
+      endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})/salesOrderLines`;
+      labelCol = 'Artikel';
+    }
+    const res = await bcGet(endpoint);
+    const regels = (res.value || []).filter(r => !r.lineType || ['Item','item',''].includes(r.lineType));
+
+    if (!regels.length) {
+      sectie.innerHTML = `<div class="regels-sectie"><div class="regels-titel">Orderregels</div><div class="regels-laadbericht">Geen regels gevonden</div></div>`;
+      return;
+    }
+
+    const kolommen = type === 'inkoop'
+      ? ['Nr.', 'Omschrijving', 'Eenheid', 'Hoeveelheid', 'Prijs', 'Bedrag']
+      : ['Nr.', 'Omschrijving', 'Eenheid', 'Hoeveelheid', 'Prijs', 'Bedrag', 'Leverdatum'];
+
+    let tabelHtml = `<div class="regels-sectie"><div class="regels-titel">Orderregels (${regels.length})</div>
+      <table class="regels-tabel"><thead><tr>${kolommen.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>`;
+
+    regels.forEach(r => {
+      const bedrag = r.amountExcludingTax != null
+        ? '€ ' + r.amountExcludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2})
+        : (r.lineAmount != null ? '€ ' + r.lineAmount.toLocaleString('nl-NL',{minimumFractionDigits:2}) : '—');
+      const prijs = r.unitPrice != null ? '€ ' + r.unitPrice.toLocaleString('nl-NL',{minimumFractionDigits:2}) : '—';
+      const hoeveelheid = r.quantity != null ? r.quantity.toLocaleString('nl-NL') : '—';
+      if (type === 'inkoop') {
+        tabelHtml += `<tr>
+          <td>${esc(r.lineObjectNumber || r.itemId || '—')}</td>
+          <td>${esc(r.description || '—')}</td>
+          <td>${esc(r.unitOfMeasureCode || '—')}</td>
+          <td class="num">${hoeveelheid}</td>
+          <td class="num">${prijs}</td>
+          <td class="num">${bedrag}</td>
+        </tr>`;
+      } else {
+        const leverdatum = (r.shipmentDate || r.requestedDeliveryDate || '').substring(0,10);
+        tabelHtml += `<tr>
+          <td>${esc(r.lineObjectNumber || r.itemId || '—')}</td>
+          <td>${esc(r.description || '—')}</td>
+          <td>${esc(r.unitOfMeasureCode || '—')}</td>
+          <td class="num">${hoeveelheid}</td>
+          <td class="num">${prijs}</td>
+          <td class="num">${bedrag}</td>
+          <td>${leverdatum ? fDatum(leverdatum) : '—'}</td>
+        </tr>`;
+      }
+    });
+
+    tabelHtml += '</tbody></table></div>';
+    sectie.innerHTML = tabelHtml;
+  } catch(e) {
+    sectie.innerHTML = `<div class="regels-sectie"><div class="regels-laadbericht" style="color:var(--rood)">Fout: ${esc(e.message)}</div></div>`;
+  }
+}
+
 function sluitModal() { document.getElementById('modal').classList.remove('open'); }
 document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') sluitModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') sluitModal(); });
