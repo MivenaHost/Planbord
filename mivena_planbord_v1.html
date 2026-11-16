@@ -873,7 +873,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.7</span></div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.8</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -1095,7 +1095,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '1.7';
+const VERSIE     = '1.8';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -2141,7 +2141,6 @@ function toonDetail(idx) {
     rijen += rij('Ordernummer',          esc(r.number || item.ref));
     rijen += rij('Leverancier',          esc(r.vendorName));
     rijen += rij('Leveranciersnummer',   esc(r.vendorNumber));
-    rijen += rij('Status',               esc(r.status));
     rijen += rij('Orderdatum',           fDatum((r.orderDate||'').substring(0,10)));
     rijen += rij('Boekingsdatum',        fDatum((r.postingDate||'').substring(0,10)));
     rijen += rij('Verw. ontvangstdatum', fDatum((r.requestedReceiptDate || r.expectedReceiptDate || r.dueDate || '').substring(0,10)));
@@ -2154,10 +2153,9 @@ function toonDetail(idx) {
     rijen += rij('Ordernummer',          esc(r.number || item.ref));
     rijen += rij('Klantnaam',            esc(r.customerName));
     rijen += rij('Klantnummer',          esc(r.customerNumber));
-    rijen += rij('Status',               esc(r.status));
     rijen += rij('Orderdatum',           fDatum((r.orderDate||'').substring(0,10)));
     rijen += rij('Boekingsdatum',        fDatum((r.postingDate||'').substring(0,10)));
-    rijen += rij('Verzochte leverdatum',  fDatum((r.requestedDeliveryDate||'').substring(0,10)));
+    rijen += rij('Verzochte leverdatum', fDatum((r.requestedDeliveryDate||'').substring(0,10)));
     rijen += rij('Vervaldatum (productie)',fDatum((r.dueDate||'').substring(0,10)));
     rijen += rij('Toegezegde leverdatum',fDatum((r.promisedDeliveryDate||'').substring(0,10)));
     rijen += rij('Extern documentnr.',   esc(r.externalDocumentNumber));
@@ -2170,9 +2168,40 @@ function toonDetail(idx) {
     rijen += rij('Totaal incl. BTW',     r.totalAmountIncludingTax != null ? '€ ' + r.totalAmountIncludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null, true);
   }
 
-  // OData orders hebben geen GUID maar wel een ordernummer als _odataNo
   const orderId = r.id || r._odataNo || null;
   const isOdata  = r._source === 'odata';
+
+  // "Verwijder uit planning" knop — rechtsboven, klein, voor alle drie categorieën
+  const kanVerwijderen = orderId && verbonden && (
+    type === 'inkoop' || ((type === 'productie' || type === 'transport') && isOdata)
+  );
+  const verwijderKnopHeader = kanVerwijderen ? `
+    <button onclick="verwijderUitPlanning('${orderId}','${type}')"
+      title="Verwijder uit planning"
+      style="position:absolute;top:14px;right:46px;background:#FFF0F0;color:#C0392B;border:1px solid #F5C6C6;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;line-height:1">
+      <svg viewBox="0 0 24 24" fill="none" width="12" height="12"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Uit planning
+    </button>` : '';
+
+  // Voeg verwijder-knop toe aan modal header
+  const modalHoofd = document.querySelector('#modal .modal-hoofd');
+  if (modalHoofd) {
+    const bestaand = modalHoofd.querySelector('.verwijder-knop-header');
+    if (bestaand) bestaand.remove();
+    if (kanVerwijderen) {
+      const tmp = document.createElement('div');
+      tmp.className = 'verwijder-knop-header';
+      tmp.style.cssText = 'position:absolute;top:14px;right:46px';
+      tmp.innerHTML = `<button onclick="verwijderUitPlanning('${orderId}','${type}')"
+        title="Verwijder uit planning"
+        style="background:#FFF0F0;color:#C0392B;border:1px solid #F5C6C6;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;line-height:1.4">
+        <svg viewBox="0 0 24 24" fill="none" width="12" height="12"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Uit planning
+      </button>`;
+      modalHoofd.style.position = 'relative';
+      modalHoofd.appendChild(tmp);
+    }
+  }
 
   // Orderregels knop
   const detailKnop = orderId && verbonden ? `
@@ -2182,29 +2211,27 @@ function toonDetail(idx) {
     </button>
   ` : '';
 
-  // "Verwijder uit planning" knop — alleen voor productie en transport (OData verkooporders)
-  const verwijderKnop = (type === 'productie' || type === 'transport') && isOdata && orderId && verbonden ? `
-    <button class="detail-knop" onclick="verwijderUitPlanning('${orderId}','${type}')"
-      style="background:#FFF0F0;color:#C0392B;border-color:#F5C6C6;margin-top:6px">
-      <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Verwijder uit planning (maakt datum leeg in BC)
-    </button>
-  ` : '';
-
-  document.getElementById('modalBody').innerHTML = rijen + detailKnop + verwijderKnop + '<div id="regelsSectie"></div>';
+  document.getElementById('modalBody').innerHTML = rijen + detailKnop + '<div id="regelsSectie"></div>';
   document.getElementById('modal').classList.add('open');
 }
 
-async function verwijderUitPlanning(orderNo, type) {
-  if (!confirm(`Datum verwijderen uit planning voor order ${orderNo}?\nHet veld in Business Central wordt leeggemaakt.`)) return;
+async function verwijderUitPlanning(orderId, type) {
+  if (!confirm(`Datum verwijderen voor order ${orderId}?\nHet datumveld in Business Central wordt leeggemaakt.`)) return;
   sluitModal();
   toon('Datum verwijderen in BC…');
   try {
-    const datumVeld = type === 'productie' ? prdDateVeld : trnDateVeld;
-    const odataVeld = naarODataVeld(datumVeld);
-    const url = `${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderNo)}')`;
-    await bcPatch(url, { [odataVeld]: null });
-    toon('✓ Datum verwijderd — ' + orderNo + ' staat niet meer ingepland');
+    if (type === 'inkoop') {
+      // Inkoop → REST API PATCH met null
+      await bcPatch(`/companies(${bcBedrijfId})/purchaseOrders(${orderId})`,
+        { [inkVeldActief]: null });
+    } else {
+      // Productie / Transport → OData PATCH met null
+      const datumVeld = type === 'productie' ? prdDateVeld : trnDateVeld;
+      const odataVeld = naarODataVeld(datumVeld);
+      const url = `${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderId)}')`;
+      await bcPatch(url, { [odataVeld]: null });
+    }
+    toon('✓ Datum verwijderd — ' + orderId + ' staat niet meer ingepland');
     setTimeout(() => haalData(), 1200);
   } catch(e) {
     console.error('Verwijder fout:', e);
@@ -2291,7 +2318,11 @@ async function haalOrderRegels(orderId, type) {
   }
 }
 
-function sluitModal() { document.getElementById('modal').classList.remove('open'); }
+function sluitModal() {
+  document.getElementById('modal').classList.remove('open');
+  // Ruim verwijder-knop op zodat hij niet blijft hangen bij volgende open
+  document.querySelector('#modal .verwijder-knop-header')?.remove();
+}
 document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') sluitModal(); });
 document.getElementById('notitieModal').addEventListener('click', e => { if (e.target.id === 'notitieModal') sluitNotitieModal(); });
 document.getElementById('notitieNieuwModal').addEventListener('click', e => { if (e.target.id === 'notitieNieuwModal') sluitNieuwNotitie(); });
