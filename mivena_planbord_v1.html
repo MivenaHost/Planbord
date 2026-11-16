@@ -1303,13 +1303,13 @@ async function latVallen(event, nieuweDatum, catType) {
       await bcPatch(ep, { [prdDateVeld]: nieuweDatum });
 
     } else {
-      // Transport → ALLEEN requestedDeliveryDate. Productie (dueDate) blijft ongewijzigd.
+      // Transport → trnDateVeld (toegezegde leverdatum, of requestedDeliveryDate als fallback)
       const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
       try {
-        await bcPatch(ep, { requestedDeliveryDate: nieuweDatum });
+        await bcPatch(ep, { [trnDateVeld]: nieuweDatum });
       } catch(patchErr) {
-        // BC blokkeert dit als Toegezegde leverdatum ingevuld is — niet bereikbaar via standaard API.
-        if (patchErr.message.includes('Toegezegde') || patchErr.message.includes('promised') || patchErr.message.includes('Dialog')) {
+        // Als BC blokkeert (Toegezegde leverdatum validatie), probeer ook requestedDeliveryDate mee
+        if (patchErr.message.includes('Toegezegde') || patchErr.message.includes('Dialog')) {
           toon('⚠ Pas Toegezegde leverdatum handmatig aan in Business Central');
           return;
         }
@@ -1330,11 +1330,11 @@ async function latVallen(event, nieuweDatum, catType) {
 /* ══════════════════════════════════════
    DATA OPHALEN UIT BC
    - Inkoop:    expectedReceiptDate (verwachte ontvangstdatum)
-   - Productie: dueDate (vervaldatum/productiedatum) — client-side filter
-   - Transport: requestedDeliveryDate (verzochte leverdatum)
+   - Productie: requestedDeliveryDate (verzochte leverdatum)
+   - Transport: promisedDeliveryDate / toegezegde leverdatum (auto-detect)
 ══════════════════════════════════════ */
-let prdDateVeld = 'dueDate'; // wordt bevestigd bij laden
-let trnDateVeld = 'requestedDeliveryDate';
+let prdDateVeld = 'requestedDeliveryDate';
+let trnDateVeld = 'requestedDeliveryDate'; // wordt overschreven als beter veld gevonden
 
 async function haalData() {
   if (!verbonden || !bcBedrijfId) return;
@@ -1363,33 +1363,43 @@ async function haalData() {
     }
     if (!poRes) poRes = { value: [] };
 
-    // ── PRODUCTIE ── dueDate (vervaldatum) — haal ALLE open orders op en filter client-side
-    // zodat productie en transport onafhankelijk werken (transport gebruikt requestedDeliveryDate)
+    // ── VERKOOPORDERS OPHALEN (één keer voor productie + transport) ──
+    // Haal ALLE open verkooporders op; filter daarna client-side op het juiste datumveld.
+    // Dit is nodig omdat productie en transport verschillende datumvelden gebruiken.
     let alleSORes = null;
     try {
       alleSORes = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=500`);
     } catch(e) { alleSORes = { value: [] }; }
     const alleOrders = alleSORes?.value || [];
 
-    // Detecteer prdDateVeld: dueDate als het veld bestaat en waarden heeft, anders requestedDeliveryDate
-    const heeftDueDate = alleOrders.some(so => so.dueDate && so.dueDate !== '0001-01-01');
-    prdDateVeld = heeftDueDate ? 'dueDate' : 'requestedDeliveryDate';
-    console.log('Productie datumveld:', prdDateVeld);
-
-    const soPrdRes = { value: alleOrders.filter(so => dagSet.has((so[prdDateVeld]||'').substring(0,10))) };
-    console.log('Productie orders in week:', soPrdRes.value.length);
-
-    // ── TRANSPORT ── requestedDeliveryDate (onafhankelijk van productie)
-    let soTrnRes = null;
-    try {
-      soTrnRes = await bcGet(
-        `/companies(${bcBedrijfId})/salesOrders` +
-        `?$filter=requestedDeliveryDate ge ${van} and requestedDeliveryDate le ${tot}`
-      );
-      console.log('Transport datumveld: requestedDeliveryDate →', soTrnRes.value?.length, 'orders');
-    } catch(e) {
-      soTrnRes = { value: [] };
+    // Log alle veldnamen van een sample order zodat we het transport-veld kunnen ontdekken
+    if (alleOrders.length > 0) {
+      const sample = alleOrders[0];
+      const datumVelden = Object.entries(sample)
+        .filter(([k,v]) => v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)))
+        .map(([k,v]) => `${k}=${v}`);
+      console.log('Verkooporder datumvelden (sample):', datumVelden.join(' | '));
     }
+
+    // ── PRODUCTIE ── requestedDeliveryDate (verzochte leverdatum)
+    prdDateVeld = 'requestedDeliveryDate';
+    const soPrdRes = { value: alleOrders.filter(so => dagSet.has((so.requestedDeliveryDate||'').substring(0,10))) };
+    console.log('Productie (requestedDeliveryDate) orders in week:', soPrdRes.value.length);
+
+    // ── TRANSPORT ── toegezegde leverdatum: probeer kandidaat-velden
+    // Standaard BC API veld: promisedDeliveryDate. Sommige installaties gebruiken andere namen.
+    const trnKandidaten = ['promisedDeliveryDate','plannedDeliveryDate','shipmentDate','requestedShipmentDate'];
+    let gevondenTrnVeld = null;
+    for (const k of trnKandidaten) {
+      if (alleOrders.some(so => k in so && so[k] && so[k] !== '0001-01-01')) {
+        gevondenTrnVeld = k;
+        break;
+      }
+    }
+    trnDateVeld = gevondenTrnVeld || 'requestedDeliveryDate';
+    console.log('Transport datumveld:', trnDateVeld, gevondenTrnVeld ? '(gevonden)' : '(fallback — toegezegde leverdatum niet in API)');
+
+    const soTrnRes = { value: alleOrders.filter(so => dagSet.has((so[trnDateVeld]||'').substring(0,10))) };
     if (!soTrnRes) soTrnRes = { value: [] };
 
     liveData = {
@@ -1429,7 +1439,7 @@ function verwerkInkoop(res) {
 function verwerkProductie(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    const datum = (so[prdDateVeld] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
@@ -1447,7 +1457,8 @@ function verwerkProductie(res) {
 function verwerkTransport(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    // Gebruik het gedetecteerde transport-datumveld (toegezegde leverdatum of fallback)
+    const datum = (so[trnDateVeld] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
@@ -1871,10 +1882,10 @@ async function kiesOrder(orderId, ref, naam) {
         { [prdDateVeld]: _pickerDatum });
 
     } else {
-      // Transport → ALLEEN requestedDeliveryDate. Productie (dueDate) blijft ongewijzigd.
+      // Transport → trnDateVeld (toegezegde leverdatum of fallback)
       const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
       try {
-        await bcPatch(ep, { requestedDeliveryDate: _pickerDatum });
+        await bcPatch(ep, { [trnDateVeld]: _pickerDatum });
       } catch(pErr) {
         if (pErr.message.includes('Toegezegde') || pErr.message.includes('Dialog')) {
           toon('⚠ Pas Toegezegde leverdatum handmatig aan in Business Central');
