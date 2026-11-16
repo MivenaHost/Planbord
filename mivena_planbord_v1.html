@@ -957,15 +957,25 @@ async function haalData() {
       `&$expand=purchaseOrderLines`
     );
 
-    // Haal verkooporders op voor productie (datum = shipmentDate = Verzenddatum/Vervaldatum)
-    const soPrdRes = await bcGet(
-      `/companies(${bcBedrijfId})/salesOrders` +
-      `?$filter=shipmentDate ge ${van} and shipmentDate le ${tot}` +
-      `&$expand=salesOrderLines`
-    );
-
-    // Haal verkooporders op voor transport (datum = shipmentDate, gefilterd op leveringsdatum)
-    // Zelfde veld gebruiken — transport toont orders op verzenddatum
+    // Haal verkooporders op — probeer verschillende datumvelden
+    const soDateVelden = ['shipmentDate','dueDate','requestedDeliveryDate','promisedDeliveryDate','orderDate'];
+    let soDateVeld = 'orderDate';
+    let soPrdRes = null;
+    for (const veld of soDateVelden) {
+      try {
+        soPrdRes = await bcGet(
+          `/companies(${bcBedrijfId})/salesOrders` +
+          `?$filter=${veld} ge ${van} and ${veld} le ${tot}` +
+          `&$expand=salesOrderLines`
+        );
+        soDateVeld = veld;
+        console.log('Verkooporder datumveld gevonden:', veld);
+        break;
+      } catch(e) {
+        if (!e.message.includes('Could not find a property')) throw e;
+      }
+    }
+    if (!soPrdRes) soPrdRes = { value: [] };
     const soTrnRes = soPrdRes;
 
     liveData = {
@@ -1005,10 +1015,13 @@ function verwerkInkoop(res) {
 function verwerkProductie(res) {
   const uit = [];
   (res.value || []).forEach(so => {
+    // Gebruik het eerste datumveld dat beschikbaar is
+    const datum = (so.shipmentDate || so.dueDate || so.requestedDeliveryDate
+                || so.promisedDeliveryDate || so.orderDate || '').substring(0,10);
     (so.salesOrderLines?.value || []).forEach(r => {
       if (!['Item','item'].includes(r.lineType)) return;
       uit.push({
-        datum:    (so.shipmentDate || so.orderDate || '').substring(0,10),
+        datum,
         ref:      so.number,
         klant:    so.customerName,
         artikel:  r.description || r.itemId,
@@ -1023,15 +1036,17 @@ function verwerkProductie(res) {
 function verwerkTransport(res) {
   const uit = [];
   (res.value || []).forEach(so => {
+    const datum = (so.shipmentDate || so.dueDate || so.requestedDeliveryDate
+                || so.promisedDeliveryDate || so.orderDate || '').substring(0,10);
     (so.salesOrderLines?.value || []).forEach(r => {
       if (!['Item','item'].includes(r.lineType)) return;
       uit.push({
-        datum:    (so.shipmentDate || so.orderDate || '').substring(0,10),
+        datum,
         ref:      so.number,
         klant:    so.customerName,
         artikel:  r.description || r.itemId,
         hoeveelheid: r.quantity || 0,
-        vervaldatum: (so.shipmentDate || '').substring(0,10)
+        vervaldatum: datum
       });
     });
   });
