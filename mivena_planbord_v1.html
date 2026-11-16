@@ -873,7 +873,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.5</span></div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.6</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -950,32 +950,82 @@ body {
 
 <!-- INSTELLINGEN MODAL -->
 <div class="modal-achtergrond" id="instellingenModal">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-hoofd">
-      <div class="modal-type" style="background:#F0F4FF;color:#2558A0">Veldinstellingen</div>
-      <div class="modal-naam" style="font-size:15px">Datumvelden Business Central</div>
+      <div class="modal-type" style="background:#F0F4FF;color:#2558A0">Over het planbord</div>
+      <div class="modal-naam" style="font-size:15px">Hoe werkt het?</div>
       <button class="modal-sluiten" onclick="sluitInstellingen()">
         <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
       </button>
     </div>
     <div class="modal-body">
-      <div class="inst-rij">
-        <label class="inst-label">Inkoop — datumveld</label>
-        <input type="text" id="instInkoop" class="inst-input" placeholder="expectedReceiptDate" />
-        <div class="inst-hint">REST API veldnaam voor <strong>verwachte ontvangstdatum</strong> op inkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">expectedReceiptDate</code></div>
+
+      <!-- Uitleg sectie -->
+      <div style="font-size:13px;line-height:1.65;color:#333;margin-bottom:20px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:#1a1a2e">Het planbord haalt data op uit Business Central op drie manieren:</div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;padding:12px;background:#EEF4FF;border-radius:8px">
+          <div style="background:#2558A0;color:#fff;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:800;white-space:nowrap;margin-top:1px">INKOOP</div>
+          <div>
+            Kijkt naar <strong>inkooporders</strong> in BC.<br>
+            Gebruikt het veld <strong>"Verwachte ontvangstdatum"</strong> — dit is de datum waarop je verwacht dat de spullen van de leverancier binnenkomen.<br>
+            <span style="color:#666;font-size:12px">Verbinding: via de standaard BC API (purchaseOrders)</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;padding:12px;background:#FFF5EC;border-radius:8px">
+          <div style="background:#E07B2A;color:#fff;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:800;white-space:nowrap;margin-top:1px">PRODUCTIE</div>
+          <div>
+            Kijkt naar <strong>verkooporders</strong> in BC.<br>
+            Gebruikt het veld <strong>"Vervaldatum"</strong> — dit is de datum waarop de productie klaar moet zijn.<br>
+            <span style="color:#666;font-size:12px">Verbinding: via OData webservice "SalesOrder" (pagina 42)</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:6px;padding:12px;background:#EEF8F2;border-radius:8px">
+          <div style="background:#2A7A4B;color:#fff;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:800;white-space:nowrap;margin-top:1px">TRANSPORT</div>
+          <div>
+            Kijkt naar <strong>verkooporders</strong> in BC.<br>
+            Gebruikt het veld <strong>"Toegezegde leverdatum"</strong> — dit is de datum die je aan de klant hebt beloofd.<br>
+            <span style="color:#666;font-size:12px">Verbinding: via OData webservice "SalesOrder" (pagina 42)</span>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;padding:10px 12px;background:#F9F9F9;border-radius:7px;border-left:3px solid #ccc;font-size:12px;color:#555">
+          <strong>Tip:</strong> Als Productie leeg is, staat de "Vervaldatum" nog niet ingevuld op die verkooporders in BC. Sleep een order naar de gewenste dag of open de order in BC en vul de datum in.
+        </div>
       </div>
-      <div class="inst-rij">
-        <label class="inst-label">Productie — datumveld</label>
-        <input type="text" id="instProductie" class="inst-input" placeholder="dueDate" />
-        <div class="inst-hint">OData veldnaam voor <strong>vervaldatum / productiedatum</strong> op verkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">dueDate</code> (= BC-veld <em>Due_Date</em>).<br>
-          Beschikbare velden: <strong id="instBeschikbareVelden" style="color:var(--groen-mid)">laden…</strong></div>
+
+      <!-- Beschikbare velden (info) -->
+      <div style="font-size:12px;color:#666;margin-bottom:16px">
+        Beschikbare datumvelden in jouw BC:
+        <span id="instBeschikbareVelden" style="color:var(--groen-mid);font-weight:600">verbind eerst met BC</span>
       </div>
-      <div class="inst-rij">
-        <label class="inst-label">Transport — datumveld</label>
-        <input type="text" id="instTransport" class="inst-input" placeholder="promisedDeliveryDate" />
-        <div class="inst-hint">OData veldnaam voor <strong>toegezegde leverdatum</strong> op verkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">promisedDeliveryDate</code> (= BC-veld <em>Promised_Delivery_Date</em>).</div>
-      </div>
-      <button class="inst-opslaan" onclick="slaanInstellingenOp()">Opslaan &amp; herladen</button>
+
+      <!-- Geavanceerde instellingen -->
+      <details style="border:1px solid #e0e4ea;border-radius:8px;padding:0">
+        <summary style="cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#2558A0;list-style:none;display:flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
+          Geavanceerd — veldnamen aanpassen
+        </summary>
+        <div style="padding:14px;border-top:1px solid #e0e4ea">
+          <div style="font-size:12px;color:#666;margin-bottom:12px">Vul hier een andere veldnaam in als je een afwijkend BC-veld wilt gebruiken. Laat leeg voor de standaardinstelling.</div>
+          <div class="inst-rij">
+            <label class="inst-label">Inkoop — datumveld</label>
+            <input type="text" id="instInkoop" class="inst-input" placeholder="expectedReceiptDate (standaard)" />
+          </div>
+          <div class="inst-rij">
+            <label class="inst-label">Productie — datumveld</label>
+            <input type="text" id="instProductie" class="inst-input" placeholder="dueDate (standaard)" />
+          </div>
+          <div class="inst-rij" style="margin-bottom:0">
+            <label class="inst-label">Transport — datumveld</label>
+            <input type="text" id="instTransport" class="inst-input" placeholder="promisedDeliveryDate (standaard)" />
+          </div>
+        </div>
+      </details>
+
+      <button class="inst-opslaan" onclick="slaanInstellingenOp()" style="margin-top:16px">Opslaan &amp; herladen</button>
     </div>
   </div>
 </div>
@@ -1045,7 +1095,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '1.5';
+const VERSIE     = '1.6';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1362,13 +1412,13 @@ async function latVallen(event, nieuweDatum, catType) {
     } else if (type === 'productie') {
       // Productie → OData, Due_Date (vervaldatum/productiedatum)
       const odataVeld = naarODataVeld(prdDateVeld);
-      const url = `${BC_SO_ODATA}(No='${encodeURIComponent(orderNo)}')`;
+      const url = `${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderNo)}')`;
       await bcPatch(url, { [odataVeld]: nieuweDatum });
 
     } else {
       // Transport → OData, Promised_Delivery_Date (toegezegde leverdatum)
       const odataVeld = naarODataVeld(trnDateVeld);
-      const url = `${BC_SO_ODATA}(No='${encodeURIComponent(orderNo)}')`;
+      const url = `${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderNo)}')`;
       await bcPatch(url, { [odataVeld]: nieuweDatum });
     }
 
@@ -1999,13 +2049,13 @@ async function kiesOrder(orderId, ref, naam) {
     } else if (_pickerType === 'productie') {
       // Productie → OData, Due_Date (vervaldatum/productiedatum)
       const odataVeld = naarODataVeld(prdDateVeld);
-      await bcPatch(`${BC_SO_ODATA}(No='${encodeURIComponent(orderId)}')`,
+      await bcPatch(`${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderId)}')`,
         { [odataVeld]: _pickerDatum });
 
     } else {
       // Transport → OData, Promised_Delivery_Date (toegezegde leverdatum)
       const odataVeld = naarODataVeld(trnDateVeld);
-      await bcPatch(`${BC_SO_ODATA}(No='${encodeURIComponent(orderId)}')`,
+      await bcPatch(`${BC_SO_ODATA}(Document_Type='Order',No='${encodeURIComponent(orderId)}')`,
         { [odataVeld]: _pickerDatum });
     }
     toon('✓ ' + ref + ' ingepland op ' + fDatum(_pickerDatum));
