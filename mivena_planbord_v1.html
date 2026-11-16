@@ -1124,39 +1124,47 @@ async function latVallen(event, nieuweDatum, catType) {
   const orderId = item._raw.id;
   let endpoint, body;
 
+  // Auto-detecteer extra datumvelden in het ruwe order-object
+  // BC vereist soms dat beide datumvelden (verzochte + toegezegde) samen worden bijgewerkt
+  const rawOrder = item._raw || {};
+  const datumPatroon = /^\d{4}-\d{2}-\d{2}/;
+  const bekendeDateVelden = new Set(['orderDate','postingDate','requestedDeliveryDate',
+    'requestedReceiptDate','expectedReceiptDate','lastModifiedDateTime','lastModifiedDatetime']);
+
+  // Zoek extra datumvelden die NIET de bekende zijn
+  const extraDateVelden = Object.entries(rawOrder)
+    .filter(([k, v]) => typeof v === 'string' && datumPatroon.test(v) && !bekendeDateVelden.has(k))
+    .map(([k]) => k);
+  console.log('Extra datumvelden op order:', extraDateVelden, '| rawOrder datum-entries:',
+    Object.entries(rawOrder).filter(([,v]) => typeof v === 'string' && datumPatroon.test(v)).map(([k,v])=>k+'='+v));
+
   if (type === 'inkoop') {
     endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
     body = { requestedReceiptDate: nieuweDatum };
+    // Voeg extra inkoop-datumvelden toe (bijv. expectedReceiptDate)
+    extraDateVelden.forEach(k => { body[k] = nieuweDatum; });
   } else {
     endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-    // Transport = toegezegde leverdatum (promisedDeliveryDate)
-    // Productie = verzochte leverdatum (requestedDeliveryDate)
-    body = type === 'transport'
-      ? { promisedDeliveryDate: nieuweDatum }
-      : { requestedDeliveryDate: nieuweDatum };
+    body = { requestedDeliveryDate: nieuweDatum };
+    // Voeg alle extra datumvelden toe zodat BC niet blokkeert (synchroniseer alle leverdatums)
+    extraDateVelden.forEach(k => { body[k] = nieuweDatum; });
   }
 
   toon('Datum bijwerken in BC…');
+  console.log('PATCH body:', body);
   try {
     await bcPatch(endpoint, body);
     toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
     item.datum = nieuweDatum;
+    if (item._raw) {
+      item._raw.requestedDeliveryDate = nieuweDatum;
+      extraDateVelden.forEach(k => { if (item._raw) item._raw[k] = nieuweDatum; });
+    }
     teken();
     setTimeout(() => haalData(), 2000);
   } catch(e) {
     console.error('PATCH fout:', e);
-    // Als requestedDeliveryDate geblokkeerd wordt, probeer promisedDeliveryDate
-    if (type === 'productie' && e.message.includes('kunt d')) {
-      try {
-        await bcPatch(endpoint, { promisedDeliveryDate: nieuweDatum });
-        toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
-        item.datum = nieuweDatum;
-        teken();
-        setTimeout(() => haalData(), 2000);
-        return;
-      } catch(e2) { /* toon originele fout */ }
-    }
-    toon('⚠ Datum niet bijgewerkt: ' + e.message.substring(0, 100));
+    toon('⚠ ' + e.message.substring(0, 120));
   }
 }
 
