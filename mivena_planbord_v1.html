@@ -516,8 +516,8 @@ body {
 /* ═══════════════════════════════════════
    NOTITIE
 ═══════════════════════════════════════ */
-.notitie-sec, .tl-not-cel {
-  padding: 7px 11px 9px;
+.tl-not-cel {
+  padding: 7px 9px 9px;
 }
 .notitie-label {
   font-size: 9px;
@@ -528,42 +528,116 @@ body {
   margin-bottom: 5px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
 }
 .notitie-label svg { width: 10px; height: 10px; }
-.notitie-veld {
-  width: 100%;
-  min-height: 44px;
+.not-plus-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 700; color: var(--groen-mid);
+  background: var(--groen-zacht); border: 1px solid var(--groen-licht);
+  border-radius: 5px; padding: 2px 7px; cursor: pointer;
+  transition: background .1s; letter-spacing: 0; text-transform: none;
+}
+.not-plus-btn:hover { background: #C0EBD0; }
+.notitie-tile {
+  background: #F7FAF5;
   border: 1px solid var(--lijn);
+  border-left: 3px solid var(--groen-licht);
   border-radius: 6px;
   padding: 5px 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 11.5px;
-  color: var(--tekst);
-  background: #F7FAF5;
-  resize: none;
-  outline: none;
-  line-height: 1.45;
-  transition: border-color .12s;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: background .1s, border-color .1s;
 }
-.notitie-veld:focus { border-color: var(--groen-licht); background: #fff; }
-.notitie-veld::placeholder { color: #B5BEB2; }
-.notitie-info { display: flex; gap: 6px; margin-top: 4px; min-height: 16px; align-items: center; }
+.notitie-tile:hover { background: var(--groen-zacht); border-color: var(--groen-licht); }
+.notitie-tile-titel {
+  font-size: 11.5px; font-weight: 700; color: var(--tekst);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.35;
+}
+.notitie-tile-meta {
+  display: flex; gap: 5px; align-items: center; margin-top: 2px; flex-wrap: wrap;
+}
 .notitie-init {
   background: var(--groen);
   color: #EBF4EE;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  padding: 1px 6px;
-  border-radius: 5px;
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  padding: 1px 6px; border-radius: 5px;
 }
 .notitie-tijd { font-size: 9.5px; color: var(--muted); }
-.opgeslagen-ind {
-  font-size: 9.5px; color: var(--groen-mid);
-  opacity: 0; transition: opacity .3s; height: 12px;
+.not-dialoog-cnt {
+  font-size: 9px; color: var(--groen-mid); font-weight: 600;
 }
-.opgeslagen-ind.aan { opacity: 1; }
+
+/* ─── Notitie modals ─── */
+.modal-type.notitie { background: #F0F4FF; color: #2558A0; }
+.not-modal-inhoud {
+  font-size: 13.5px; color: var(--tekst); line-height: 1.6;
+  padding: 10px 0 14px; border-bottom: 1px solid var(--lijn);
+  white-space: pre-wrap; word-break: break-word;
+}
+.not-modal-auteur {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.not-dialoog-sectie { margin-top: 14px; }
+.not-dialoog-titel {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+}
+.not-dialoog-item {
+  display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start;
+}
+.not-init-badge {
+  background: var(--groen); color: #EBF4EE;
+  font-size: 10px; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+}
+.not-dialoog-bubble {
+  background: #F7FAF5; border: 1px solid var(--lijn); border-radius: 8px;
+  padding: 7px 10px; flex: 1;
+}
+.not-dialoog-bubble-tekst { font-size: 12.5px; color: var(--tekst); line-height: 1.5; white-space: pre-wrap; }
+.not-dialoog-bubble-tijd { font-size: 9.5px; color: var(--muted); margin-top: 3px; }
+.not-reactie-blok {
+  display: flex; gap: 8px; align-items: flex-end; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid var(--lijn);
+}
+.not-reactie-blok textarea {
+  flex: 1; padding: 7px 9px; border: 1px solid var(--lijn); border-radius: 7px;
+  font-family: 'Inter', sans-serif; font-size: 12.5px; resize: none;
+  outline: none; min-height: 36px; line-height: 1.5;
+}
+.not-reactie-blok textarea:focus { border-color: var(--groen-licht); }
+.not-stuur-btn {
+  padding: 8px 14px; background: var(--groen); color: #fff;
+  border: none; border-radius: 7px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; transition: background .1s;
+}
+.not-stuur-btn:hover { background: var(--groen-mid); }
+.not-nieuw-label {
+  font-size: 11px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px;
+}
+.not-nieuw-input {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--lijn);
+  border-radius: 7px; font-family: 'Inter', sans-serif; font-size: 13px;
+  outline: none; transition: border-color .12s; margin-bottom: 12px;
+}
+.not-nieuw-input:focus { border-color: var(--groen-licht); }
+.not-nieuw-textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--lijn);
+  border-radius: 7px; font-family: 'Inter', sans-serif; font-size: 13px;
+  outline: none; resize: vertical; min-height: 80px; transition: border-color .12s;
+}
+.not-nieuw-textarea:focus { border-color: var(--groen-licht); }
+.not-opslaan-btn {
+  margin-top: 14px; padding: 10px 16px; background: var(--groen); color: #fff;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+  cursor: pointer; width: 100%; transition: background .1s;
+}
+.not-opslaan-btn:hover { background: var(--groen-mid); }
 
 /* ═══════════════════════════════════════
    WEEKEND KNOP
@@ -834,6 +908,41 @@ body {
   </div>
 </div>
 
+<!-- NOTITIE DETAIL MODAL -->
+<div class="modal-achtergrond" id="notitieModal">
+  <div class="modal">
+    <div class="modal-hoofd">
+      <div class="modal-type notitie">Notitie</div>
+      <div id="notModalTitel" class="modal-naam">—</div>
+      <div id="notModalDatum" class="modal-datum">—</div>
+      <button class="modal-sluiten" onclick="sluitNotitieModal()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="notModalBody"></div>
+  </div>
+</div>
+
+<!-- NIEUWE NOTITIE MODAL -->
+<div class="modal-achtergrond" id="notitieNieuwModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hoofd">
+      <div class="modal-type notitie">Nieuwe notitie</div>
+      <div id="notNieuwDatumLabel" class="modal-naam" style="font-size:14px">—</div>
+      <button class="modal-sluiten" onclick="sluitNieuwNotitie()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <label class="not-nieuw-label">TITEL</label>
+      <input type="text" id="notNieuwTitel" class="not-nieuw-input" placeholder="Korte beschrijving…" onkeydown="if(event.key==='Enter')document.getElementById('notNieuwInhoud').focus()" />
+      <label class="not-nieuw-label">NOTITIE</label>
+      <textarea id="notNieuwInhoud" class="not-nieuw-textarea" placeholder="Voeg inhoud toe…" rows="4"></textarea>
+      <button class="not-opslaan-btn" onclick="slaaNieuweNotitieOp()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#74C69D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -919,9 +1028,17 @@ function weekDagen(p) {
 }
 
 /* ══════════════════════════════════════
-   NOTITIES
+   NOTITIES — per datum array van tiles
 ══════════════════════════════════════ */
-const notities = {};
+function laadNotities() {
+  try { return JSON.parse(localStorage.getItem('mivena_notities_v2') || '{}'); } catch(e) { return {}; }
+}
+function opslaanNotities() {
+  try { localStorage.setItem('mivena_notities_v2', JSON.stringify(notities)); } catch(e) {}
+}
+let notities = laadNotities();
+let _notActiefDatum = null;
+let _notActiefId    = null;
 
 /* ══════════════════════════════════════
    ITEM OPSLAG (voor modal)
@@ -1116,50 +1233,56 @@ async function latVallen(event, nieuweDatum, catType) {
   const {type, item} = opslag[sleepIdx];
   sleepIdx = null;
 
-  if (item.datum === nieuweDatum) return; // geen wijziging
+  if (item.datum === nieuweDatum) return;
 
   if (!verbonden) { toon('Niet verbonden met BC'); return; }
   if (!item._raw?.id) { toon('Order heeft geen ID — niet bij te werken'); return; }
 
   const orderId = item._raw.id;
-  let endpoint, body;
-
-  // Auto-detecteer extra datumvelden in het ruwe order-object
-  // BC vereist soms dat beide datumvelden (verzochte + toegezegde) samen worden bijgewerkt
-  const rawOrder = item._raw || {};
-  const datumPatroon = /^\d{4}-\d{2}-\d{2}/;
-  const bekendeDateVelden = new Set(['orderDate','postingDate','requestedDeliveryDate',
-    'requestedReceiptDate','expectedReceiptDate','lastModifiedDateTime','lastModifiedDatetime']);
-
-  // Zoek extra datumvelden die NIET de bekende zijn
-  const extraDateVelden = Object.entries(rawOrder)
-    .filter(([k, v]) => typeof v === 'string' && datumPatroon.test(v) && !bekendeDateVelden.has(k))
-    .map(([k]) => k);
-  console.log('Extra datumvelden op order:', extraDateVelden, '| rawOrder datum-entries:',
-    Object.entries(rawOrder).filter(([,v]) => typeof v === 'string' && datumPatroon.test(v)).map(([k,v])=>k+'='+v));
-
-  if (type === 'inkoop') {
-    endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
-    body = { requestedReceiptDate: nieuweDatum };
-    // Voeg extra inkoop-datumvelden toe (bijv. expectedReceiptDate)
-    extraDateVelden.forEach(k => { body[k] = nieuweDatum; });
-  } else {
-    endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-    body = { requestedDeliveryDate: nieuweDatum };
-    // Voeg alle extra datumvelden toe zodat BC niet blokkeert (synchroniseer alle leverdatums)
-    extraDateVelden.forEach(k => { body[k] = nieuweDatum; });
-  }
-
   toon('Datum bijwerken in BC…');
-  console.log('PATCH body:', body);
+
   try {
-    await bcPatch(endpoint, body);
+    // Velden die read-only zijn in BC API
+    const readOnly = new Set([
+      'id','systemVersion','systemCreatedAt','systemCreatedBy','systemModifiedAt','systemModifiedBy',
+      'orderDate','postingDate','lastModifiedDateTime','lastModifiedDatetime','number'
+    ]);
+
+    if (type === 'inkoop') {
+      // Inkoop: haal volledige order op om extra datumvelden te vinden
+      const endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
+      const volledigePO = await bcGet(endpoint);
+      const body = {};
+      // Voeg alle schrijfbare datumvelden toe (ook null-velden met 'date' in de naam)
+      Object.keys(volledigePO).forEach(k => {
+        if (readOnly.has(k)) return;
+        const v = volledigePO[k];
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) body[k] = nieuweDatum;
+        else if (v === null && /date/i.test(k)) body[k] = nieuweDatum;
+      });
+      if (!body.requestedReceiptDate) body.requestedReceiptDate = nieuweDatum;
+      console.log('Inkoop PATCH body:', JSON.stringify(body));
+      await bcPatch(endpoint, body);
+
+    } else {
+      // Verkoop: haal volledige order op — ook null-datumvelden zoals "Toegezegde leverdatum"
+      const endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
+      const volledigeSO = await bcGet(endpoint);
+      const body = {};
+      Object.keys(volledigeSO).forEach(k => {
+        if (readOnly.has(k)) return;
+        const v = volledigeSO[k];
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) body[k] = nieuweDatum;
+        else if (v === null && /date/i.test(k)) body[k] = nieuweDatum;
+      });
+      if (!body.requestedDeliveryDate) body.requestedDeliveryDate = nieuweDatum;
+      console.log('Verkoop PATCH body:', JSON.stringify(body));
+      await bcPatch(endpoint, body);
+    }
+
     toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
     item.datum = nieuweDatum;
-    if (item._raw) {
-      item._raw.requestedDeliveryDate = nieuweDatum;
-      extraDateVelden.forEach(k => { if (item._raw) item._raw[k] = nieuweDatum; });
-    }
+    if (item._raw) item._raw.requestedDeliveryDate = nieuweDatum;
     teken();
     setTimeout(() => haalData(), 2000);
   } catch(e) {
@@ -1474,25 +1597,29 @@ function teken() {
     rijHtml += `</div>`;
   });
 
-  // RIJ 5: notities
+  // RIJ 5: notities — tile-gebaseerd
   rijHtml += `<div class="tl-rij" style="grid-template-columns:${kolCss}">`;
   dagLijst.forEach(d => {
     const {ds, v, w, extra} = cls(d);
-    const notitie = notities[ds] || null;
-    const notTekst = notitie ? esc(notitie.tekst) : '';
-    const notitieInfo = notitie
-      ? `<div class="notitie-info" id="ni-${ds}">
-           <span class="notitie-init">${notitie.init}</span>
-           <span class="notitie-tijd">${notitie.tijdstip}</span>
-         </div>`
-      : `<div class="notitie-info" id="ni-${ds}" style="display:none"></div>`;
-    rijHtml += `<div class="tl-not-cel${extra}">
-      <div class="notitie-label">${ICO_PEN}Notitie</div>
-      <textarea class="notitie-veld" id="nt-${ds}"
-        placeholder="Voeg een notitie toe…"
-        onblur="slaNotitieOp('${ds}')">${notTekst}</textarea>
-      ${notitieInfo}
-      <div class="opgeslagen-ind" id="oi-${ds}">✓ Opgeslagen</div>
+    const dagNots = (notities[ds] || []);
+    const tilesHtml = dagNots.map(n => {
+      const diaCnt = (n.dialoog||[]).length;
+      const tijdStr = n.aangemaakt ? new Date(n.aangemaakt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) + ' ' + new Date(n.aangemaakt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="notitie-tile" onclick="toonNotitie('${ds}','${n.id}')">
+        <div class="notitie-tile-titel">${esc(n.titel||'—')}</div>
+        <div class="notitie-tile-meta">
+          <span class="notitie-init">${esc(n.auteur||'?')}</span>
+          <span class="notitie-tijd">${esc(tijdStr)}</span>
+          ${diaCnt ? `<span class="not-dialoog-cnt">+${diaCnt} reactie${diaCnt>1?'s':''}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    rijHtml += `<div class="tl-not-cel${extra}" style="background:var(--wit);border:1px solid var(--lijn);border-radius:0 0 12px 12px;">
+      <div class="notitie-label">
+        <span style="display:flex;align-items:center;gap:4px">${ICO_PEN}Notitie</span>
+        <button class="not-plus-btn" onclick="nieuwNotitieModal('${ds}')">+ Notitie</button>
+      </div>
+      ${tilesHtml}
     </div>`;
   });
   rijHtml += `</div>`;
@@ -1508,32 +1635,112 @@ function esc(s) {
 }
 
 /* ══════════════════════════════════════
-   NOTITIE OPSLAAN
+   NOTITIE FUNCTIES
 ══════════════════════════════════════ */
-function slaNotitieOp(ds) {
-  const ta = document.getElementById('nt-'+ds);
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function nieuwNotitieModal(ds) {
+  _notActiefDatum = ds;
+  _notActiefId = null;
+  const d = new Date(ds + 'T00:00:00');
+  document.getElementById('notNieuwDatumLabel').textContent =
+    DAGAMEN_arr()[d.getDay()] + ' ' + d.getDate() + ' ' + MAANDNAMEN[d.getMonth()];
+  document.getElementById('notNieuwTitel').value = '';
+  document.getElementById('notNieuwInhoud').value = '';
+  document.getElementById('notitieNieuwModal').classList.add('open');
+  setTimeout(() => document.getElementById('notNieuwTitel').focus(), 50);
+}
+
+function sluitNieuwNotitie() {
+  document.getElementById('notitieNieuwModal').classList.remove('open');
+}
+
+function slaaNieuweNotitieOp() {
+  const titel = document.getElementById('notNieuwTitel').value.trim();
+  const inhoud = document.getElementById('notNieuwInhoud').value.trim();
+  if (!titel) { document.getElementById('notNieuwTitel').focus(); return; }
+  const ds = _notActiefDatum;
+  if (!notities[ds]) notities[ds] = [];
+  notities[ds].push({ id: genId(), titel, inhoud, auteur: gebruikerInit, aangemaakt: Date.now(), dialoog: [] });
+  opslaanNotities();
+  sluitNieuwNotitie();
+  teken();
+}
+
+function toonNotitie(ds, id) {
+  _notActiefDatum = ds;
+  _notActiefId = id;
+  const nots = notities[ds] || [];
+  const n = nots.find(x => x.id === id);
+  if (!n) return;
+
+  const d = new Date(ds + 'T00:00:00');
+  const datumStr = DAGAMEN_arr()[d.getDay()] + ' ' + d.getDate() + ' ' + MAANDNAMEN[d.getMonth()];
+
+  document.getElementById('notModalTitel').textContent = n.titel || '—';
+  document.getElementById('notModalDatum').textContent = datumStr;
+
+  const tijdStr = n.aangemaakt
+    ? new Date(n.aangemaakt).toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'}) + ' · ' +
+      new Date(n.aangemaakt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})
+    : '';
+
+  let html = `<div class="not-modal-auteur">
+    <span class="not-init-badge">${esc(n.auteur||'?')}</span>
+    <span style="font-size:12px;color:var(--muted)">${esc(tijdStr)}</span>
+  </div>`;
+  if (n.inhoud) html += `<div class="not-modal-inhoud">${esc(n.inhoud)}</div>`;
+
+  if ((n.dialoog||[]).length) {
+    html += `<div class="not-dialoog-sectie">
+      <div class="not-dialoog-titel">Dialoog (${n.dialoog.length})</div>`;
+    n.dialoog.forEach(r => {
+      const rTijd = r.aangemaakt
+        ? new Date(r.aangemaakt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) + ' ' +
+          new Date(r.aangemaakt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})
+        : '';
+      html += `<div class="not-dialoog-item">
+        <div class="not-init-badge">${esc(r.auteur||'?')}</div>
+        <div class="not-dialoog-bubble">
+          <div class="not-dialoog-bubble-tekst">${esc(r.tekst)}</div>
+          <div class="not-dialoog-bubble-tijd">${esc(rTijd)}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="not-dialoog-sectie"><div class="not-dialoog-titel">Dialoog</div>
+      <div style="font-size:12px;color:var(--muted);padding:4px 0">Nog geen reacties.</div></div>`;
+  }
+
+  html += `<div class="not-reactie-blok">
+    <div class="not-init-badge">${esc(gebruikerInit)}</div>
+    <textarea id="notReactieTa" placeholder="Voeg een reactie toe…" rows="2"></textarea>
+    <button class="not-stuur-btn" onclick="voegReactieToe()">Verstuur</button>
+  </div>`;
+
+  document.getElementById('notModalBody').innerHTML = html;
+  document.getElementById('notitieModal').classList.add('open');
+  setTimeout(() => document.getElementById('notReactieTa')?.focus(), 50);
+}
+
+function voegReactieToe() {
+  const ta = document.getElementById('notReactieTa');
   if (!ta) return;
   const tekst = ta.value.trim();
-  const nu = new Date();
-  const tijdstip = `${DAGAMEN_arr()[nu.getDay()].toLowerCase()} ${nu.getDate()} ${MAANDNAMEN[nu.getMonth()]} · ${pad(nu.getHours())}:${pad(nu.getMinutes())}`;
+  if (!tekst) return;
+  const nots = notities[_notActiefDatum] || [];
+  const n = nots.find(x => x.id === _notActiefId);
+  if (!n) return;
+  if (!n.dialoog) n.dialoog = [];
+  n.dialoog.push({ auteur: gebruikerInit, tekst, aangemaakt: Date.now() });
+  opslaanNotities();
+  teken();
+  toonNotitie(_notActiefDatum, _notActiefId); // herlaad modal
+}
 
-  if (tekst) {
-    notities[ds] = { tekst, init: gebruikerInit, tijdstip };
-  } else {
-    delete notities[ds];
-  }
-
-  const ni = document.getElementById('ni-'+ds);
-  if (ni) {
-    if (notities[ds]) {
-      ni.innerHTML = `<span class="notitie-init">${gebruikerInit}</span><span class="notitie-tijd">${tijdstip}</span>`;
-      ni.style.display = 'flex';
-    } else {
-      ni.style.display = 'none';
-    }
-  }
-  const oi = document.getElementById('oi-'+ds);
-  if (oi) { oi.classList.add('aan'); clearTimeout(oi._t); oi._t = setTimeout(() => oi.classList.remove('aan'), 1800); }
+function sluitNotitieModal() {
+  document.getElementById('notitieModal').classList.remove('open');
 }
 
 /* ══════════════════════════════════════
@@ -1670,7 +1877,11 @@ async function haalOrderRegels(orderId, type) {
 
 function sluitModal() { document.getElementById('modal').classList.remove('open'); }
 document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') sluitModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') sluitModal(); });
+document.getElementById('notitieModal').addEventListener('click', e => { if (e.target.id === 'notitieModal') sluitNotitieModal(); });
+document.getElementById('notitieNieuwModal').addEventListener('click', e => { if (e.target.id === 'notitieNieuwModal') sluitNieuwNotitie(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { sluitModal(); sluitNotitieModal(); sluitNieuwNotitie(); }
+});
 
 /* ══════════════════════════════════════
    NAVIGATIE
