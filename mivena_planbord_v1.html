@@ -873,7 +873,7 @@ body {
   </div>
   <div class="header-tekst">
     <div class="header-titel">Planbord — Mivena Fabriek Maastricht</div>
-    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.4</span></div>
+    <div class="header-sub">Inkoop · Productie · Transport <span id="versieTag" style="margin-left:8px;font-size:9px;font-weight:700;letter-spacing:.06em;background:rgba(255,255,255,.15);border-radius:5px;padding:2px 7px;opacity:.8">v1.5</span></div>
   </div>
   <div class="header-rechts">
     <div class="gebruiker-badge">
@@ -962,19 +962,18 @@ body {
       <div class="inst-rij">
         <label class="inst-label">Inkoop — datumveld</label>
         <input type="text" id="instInkoop" class="inst-input" placeholder="expectedReceiptDate" />
-        <div class="inst-hint">BC API veldnaam voor <strong>verwachte ontvangstdatum</strong> op inkooporders.</div>
+        <div class="inst-hint">REST API veldnaam voor <strong>verwachte ontvangstdatum</strong> op inkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">expectedReceiptDate</code></div>
       </div>
       <div class="inst-rij">
         <label class="inst-label">Productie — datumveld</label>
-        <input type="text" id="instProductie" class="inst-input" placeholder="requestedDeliveryDate" />
-        <div class="inst-hint">BC API veldnaam voor <strong>productiedatum</strong> op verkooporders.<br>
-          Beschikbare velden in jouw BC: <strong id="instBeschikbareVelden" style="color:var(--groen-mid)">laden…</strong><br>
-          Vraag jullie BC partner om <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">dueDate</code> toe te voegen aan de salesOrder API-pagina als je een apart veld wilt.</div>
+        <input type="text" id="instProductie" class="inst-input" placeholder="dueDate" />
+        <div class="inst-hint">OData veldnaam voor <strong>vervaldatum / productiedatum</strong> op verkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">dueDate</code> (= BC-veld <em>Due_Date</em>).<br>
+          Beschikbare velden: <strong id="instBeschikbareVelden" style="color:var(--groen-mid)">laden…</strong></div>
       </div>
       <div class="inst-rij">
         <label class="inst-label">Transport — datumveld</label>
-        <input type="text" id="instTransport" class="inst-input" placeholder="requestedDeliveryDate" />
-        <div class="inst-hint">BC API veldnaam voor <strong>toegezegde leverdatum</strong> op verkooporders.</div>
+        <input type="text" id="instTransport" class="inst-input" placeholder="promisedDeliveryDate" />
+        <div class="inst-hint">OData veldnaam voor <strong>toegezegde leverdatum</strong> op verkooporders. Standaard: <code style="background:#F0F4F0;padding:1px 4px;border-radius:3px">promisedDeliveryDate</code> (= BC-veld <em>Promised_Delivery_Date</em>).</div>
       </div>
       <button class="inst-opslaan" onclick="slaanInstellingenOp()">Opslaan &amp; herladen</button>
     </div>
@@ -1046,7 +1045,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '1.4';
+const VERSIE     = '1.5';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1054,6 +1053,20 @@ const BC_ENV     = 'MivenaBV';
 const BC_CO_NAAM = 'WK46 Test';
 const BC_SCOPE   = 'https://api.businesscentral.dynamics.com/user_impersonation';
 const BC_API     = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/api/v2.0`;
+const BC_ODATA   = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/ODataV4`;
+const BC_SO_ODATA = `${BC_ODATA}/Company('${encodeURIComponent(BC_CO_NAAM)}')/SalesOrder`;
+
+// Mapping: genormaliseerde camelCase veldnaam → OData veldnaam (voor PATCH)
+const ODATA_VELD_MAP = {
+  dueDate:               'Due_Date',
+  promisedDeliveryDate:  'Promised_Delivery_Date',
+  requestedDeliveryDate: 'Requested_Delivery_Date',
+  shipmentDate:          'Shipment_Date',
+  orderDate:             'Order_Date'
+};
+function naarODataVeld(camel) {
+  return ODATA_VELD_MAP[camel] || camel.replace(/([A-Z])/g, '_$1').replace(/^_/, '');
+}
 
 /* ══════════════════════════════════════
    STAAT
@@ -1266,7 +1279,7 @@ async function bcGet(pad) {
 }
 
 async function bcPatch(pad, body) {
-  const url = BC_API + pad;
+  const url = pad.startsWith('http') ? pad : BC_API + pad;
   const r = await fetch(url, {
     method: 'PATCH',
     headers: {
@@ -1329,40 +1342,34 @@ async function latVallen(event, nieuweDatum, catType) {
 
   if (item.datum === nieuweDatum) return;
   if (!verbonden) { toon('Niet verbonden met BC'); return; }
-  if (!item._raw?.id) { toon('Order heeft geen ID — niet bij te werken'); return; }
 
-  const orderId = item._raw.id;
+  // Detecteer of dit een OData-order is (verkooporder) of REST-order (inkooporder)
+  const isOdata  = item._raw?._source === 'odata';
+  const orderId  = isOdata ? null : item._raw?.id;
+  const orderNo  = isOdata ? item._raw?._odataNo : null;
+
+  if (!isOdata && !orderId) { toon('Order heeft geen ID — niet bij te werken'); return; }
+  if (isOdata && !orderNo)  { toon('Order heeft geen ordernummer — niet bij te werken'); return; }
+
   toon('Datum bijwerken in BC…');
 
   try {
-    const readOnly = new Set([
-      'id','systemVersion','systemCreatedAt','systemCreatedBy','systemModifiedAt','systemModifiedBy',
-      'orderDate','postingDate','lastModifiedDateTime','lastModifiedDatetime','number'
-    ]);
-
     if (type === 'inkoop') {
-      // Inkoop → expectedReceiptDate (verwachte ontvangstdatum)
+      // Inkoop → REST API, expectedReceiptDate (verwachte ontvangstdatum)
       const ep = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})`;
       await bcPatch(ep, { expectedReceiptDate: nieuweDatum });
 
     } else if (type === 'productie') {
-      // Productie → ALLEEN dueDate (vervaldatum/productiedatum). Transport blijft ongewijzigd.
-      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-      await bcPatch(ep, { [prdDateVeld]: nieuweDatum });
+      // Productie → OData, Due_Date (vervaldatum/productiedatum)
+      const odataVeld = naarODataVeld(prdDateVeld);
+      const url = `${BC_SO_ODATA}(No='${encodeURIComponent(orderNo)}')`;
+      await bcPatch(url, { [odataVeld]: nieuweDatum });
 
     } else {
-      // Transport → trnDateVeld (toegezegde leverdatum, of requestedDeliveryDate als fallback)
-      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-      try {
-        await bcPatch(ep, { [trnDateVeld]: nieuweDatum });
-      } catch(patchErr) {
-        // Als BC blokkeert (Toegezegde leverdatum validatie), probeer ook requestedDeliveryDate mee
-        if (patchErr.message.includes('Toegezegde') || patchErr.message.includes('Dialog')) {
-          toon('⚠ Pas Toegezegde leverdatum handmatig aan in Business Central');
-          return;
-        }
-        throw patchErr;
-      }
+      // Transport → OData, Promised_Delivery_Date (toegezegde leverdatum)
+      const odataVeld = naarODataVeld(trnDateVeld);
+      const url = `${BC_SO_ODATA}(No='${encodeURIComponent(orderNo)}')`;
+      await bcPatch(url, { [odataVeld]: nieuweDatum });
     }
 
     toon('✓ Datum bijgewerkt naar ' + fDatum(nieuweDatum));
@@ -1376,10 +1383,34 @@ async function latVallen(event, nieuweDatum, catType) {
 }
 
 /* ══════════════════════════════════════
+   ODATA NORMALISATIE
+   Verkooporders komen via OData (pagina 42) in plaats van REST API v2.0.
+   Hierdoor zijn Due_Date (productie) en Promised_Delivery_Date (transport)
+   beschikbaar als echte onafhankelijke velden.
+══════════════════════════════════════ */
+function normalizeerODataOrder(so) {
+  return {
+    // Genormaliseerde veldnamen (camelCase) — zelfde als REST API waar mogelijk
+    number:               so.No || so.No_ || '',
+    customerName:         so.Sell_to_Customer_Name || so.Sell_to_Customer_No || '—',
+    customerNumber:       so.Sell_to_Customer_No || '',
+    orderDate:            (so.Order_Date || so.Document_Date || '').substring(0, 10),
+    requestedDeliveryDate:(so.Requested_Delivery_Date || '').substring(0, 10),
+    promisedDeliveryDate: (so.Promised_Delivery_Date || '').substring(0, 10),
+    dueDate:              (so.Due_Date || '').substring(0, 10),
+    shipmentDate:         (so.Shipment_Date || '').substring(0, 10),
+    // OData-specifiek — geen GUID, maar ordernummer als sleutel
+    _odataNo:  so.No || so.No_ || '',
+    _source:   'odata',
+    _rawOdata: so   // originele OData-response bewaren voor debug
+  };
+}
+
+/* ══════════════════════════════════════
    DATA OPHALEN UIT BC
-   - Inkoop:    expectedReceiptDate (verwachte ontvangstdatum)
-   - Productie: requestedDeliveryDate (verzochte leverdatum)
-   - Transport: promisedDeliveryDate / toegezegde leverdatum (auto-detect)
+   - Inkoop:    expectedReceiptDate via REST API (purchaseOrders)
+   - Productie: Due_Date (vervaldatum/productiedatum) via OData
+   - Transport: Promised_Delivery_Date (toegezegde leverdatum) via OData
 ══════════════════════════════════════ */
 // Instellingen uit localStorage (overschrijfbaar via tandwiel-knop)
 function laadInstellingen() {
@@ -1423,61 +1454,48 @@ async function haalData() {
     }
     if (!poRes) poRes = { value: [] };
 
-    // ── VERKOOPORDERS OPHALEN (één keer voor productie + transport) ──
-    // Haal ALLE open verkooporders op; filter daarna client-side op het juiste datumveld.
-    // Dit is nodig omdat productie en transport verschillende datumvelden gebruiken.
-    let alleSORes = null;
+    // ── VERKOOPORDERS VIA ODATA (pagina 42) ──
+    // OData geeft toegang tot Due_Date (productie) en Promised_Delivery_Date (transport)
+    // — velden die NIET beschikbaar zijn in de standaard REST API v2.0.
+    let alleOrders = [];
     try {
-      alleSORes = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=500`);
-    } catch(e) { alleSORes = { value: [] }; }
-    const alleOrders = alleSORes?.value || [];
-
-    // ── VELD-DETECTIE: haal één volledige order op om ALLE veldnamen te zien ──
-    // De lijst-API geeft soms minder velden terug dan een individuele GET.
-    let volledigeSample = null;
-    if (alleOrders.length > 0) {
-      try {
-        volledigeSample = await bcGet(`/companies(${bcBedrijfId})/salesOrders(${alleOrders[0].id})`);
-        console.log('ALLE veldnamen verkooporder:', Object.keys(volledigeSample).join(' | '));
-        const datumAchtig = Object.entries(volledigeSample)
-          .filter(([k,v]) => v === null || v === '' || (typeof v === 'string' && /^\d{4}/.test(v)))
-          .map(([k,v]) => `${k}=${JSON.stringify(v)}`);
-        console.log('Datum-achtige velden (volledig):', datumAchtig.join(' | '));
-      } catch(e) { volledigeSample = alleOrders[0]; }
-    }
-    const refOrder = volledigeSample || (alleOrders[0] || {});
-    _alleSOVelden = Object.keys(refOrder).filter(k => !k.startsWith('@'));
-
-    // ── PRODUCTIE ── gebruik handmatige instelling of auto-detect
-    if (_inst.productie && _inst.productie in refOrder) {
-      prdDateVeld = _inst.productie;
-      console.log('Productie datumveld (ingesteld):', prdDateVeld);
-    } else {
-      const prdKandidaten = ['dueDate','shipmentDate','requestedShipmentDate','plannedShipmentDate','plannedDeliveryDate'];
-      let gevondenPrdVeld = null;
-      for (const k of prdKandidaten) {
-        if (k in refOrder) { gevondenPrdVeld = k; break; }
+      const soOdataRes = await bcGet(
+        `${BC_SO_ODATA}?$top=500` +
+        `&$select=No,Sell_to_Customer_Name,Sell_to_Customer_No,` +
+        `Requested_Delivery_Date,Promised_Delivery_Date,Due_Date,Shipment_Date,Order_Date`
+      );
+      alleOrders = (soOdataRes?.value || []).map(normalizeerODataOrder);
+      console.log('OData verkooporders opgehaald:', alleOrders.length);
+      if (alleOrders.length > 0) {
+        console.log('OData veldnamen (genormaliseerd):', Object.keys(alleOrders[0]).filter(k => !k.startsWith('_')).join(' | '));
+        const sample = alleOrders[0];
+        console.log('Sample datumvelden:', {
+          dueDate: sample.dueDate,
+          promisedDeliveryDate: sample.promisedDeliveryDate,
+          requestedDeliveryDate: sample.requestedDeliveryDate
+        });
       }
-      prdDateVeld = gevondenPrdVeld || 'requestedDeliveryDate';
-      console.log('Productie datumveld:', prdDateVeld, gevondenPrdVeld ? '(gevonden)' : '(fallback = zelfde als Transport — stel handmatig in via ⚙)');
+    } catch(e) {
+      console.error('OData verkooporders fout:', e.message);
+      alleOrders = [];
     }
+
+    // Veldnamen voor instellingen-modal
+    _alleSOVelden = alleOrders.length > 0
+      ? Object.keys(alleOrders[0]).filter(k => !k.startsWith('_'))
+      : ['dueDate','promisedDeliveryDate','requestedDeliveryDate','shipmentDate','orderDate'];
+
+    // ── PRODUCTIE ── Due_Date (vervaldatum/productiedatum) — nu écht beschikbaar via OData
+    prdDateVeld = _inst.productie || 'dueDate';
+    console.log('Productie datumveld:', prdDateVeld, '→', ODATA_VELD_MAP[prdDateVeld] || prdDateVeld);
 
     const soPrdRes = { value: alleOrders.filter(so => dagSet.has((so[prdDateVeld]||'').substring(0,10))) };
     console.log('Productie orders in week:', soPrdRes.value.length);
 
-    // ── TRANSPORT ── gebruik handmatige instelling of auto-detect
-    if (_inst.transport && _inst.transport in refOrder) {
-      trnDateVeld = _inst.transport;
-      trnApiFallback = false;
-      console.log('Transport datumveld (ingesteld):', trnDateVeld);
-    } else {
-      const trnKandidaten = ['promisedDeliveryDate','plannedDeliveryDate'];
-      let gevondenTrnVeld = null;
-      for (const k of trnKandidaten) { if (k in refOrder) { gevondenTrnVeld = k; break; } }
-      trnDateVeld = gevondenTrnVeld || 'requestedDeliveryDate';
-      trnApiFallback = !gevondenTrnVeld;
-      console.log('Transport datumveld:', trnDateVeld, gevondenTrnVeld ? '(gevonden)' : '(fallback)');
-    }
+    // ── TRANSPORT ── Promised_Delivery_Date (toegezegde leverdatum) — nu écht beschikbaar via OData
+    trnDateVeld = _inst.transport || 'promisedDeliveryDate';
+    trnApiFallback = false;
+    console.log('Transport datumveld:', trnDateVeld, '→', ODATA_VELD_MAP[trnDateVeld] || trnDateVeld);
 
     const soTrnRes = { value: alleOrders.filter(so => dagSet.has((so[trnDateVeld]||'').substring(0,10))) };
 
@@ -1518,15 +1536,16 @@ function verwerkInkoop(res) {
 function verwerkProductie(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    const datum = (so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
+    // so is genormaliseerd (camelCase) — prdDateVeld is bijv. 'dueDate'
+    const datum = (so[prdDateVeld] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
       ref:        so.number,
-      klant:      so.customerName || so.customerNumber || '—',
+      klant:      so.customerName || '—',
       artikel:    '',
       hoeveelheid:'',
-      orderdatum: (so.orderDate || '').substring(0,10),
+      orderdatum: so.orderDate || '',
       _raw:       so
     });
   });
@@ -1536,13 +1555,13 @@ function verwerkProductie(res) {
 function verwerkTransport(res) {
   const uit = [];
   (res.value || []).forEach(so => {
-    // Gebruik het gedetecteerde transport-datumveld (toegezegde leverdatum of fallback)
+    // so is genormaliseerd (camelCase) — trnDateVeld is bijv. 'promisedDeliveryDate'
     const datum = (so[trnDateVeld] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10);
     if (!datum) return;
     uit.push({
       datum,
       ref:        so.number,
-      klant:      so.customerName || so.customerNumber || '—',
+      klant:      so.customerName || '—',
       artikel:    '',
       hoeveelheid:'',
       _raw:       so
@@ -1921,15 +1940,23 @@ async function openOrderPicker(datum, type) {
         _raw:  po
       }));
     } else {
-      const res = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$top=200`);
-      const datumKey = _pickerType === 'productie' ? prdDateVeld : 'requestedDeliveryDate';
-      _pickerAlleOrders = (res.value || []).map(so => ({
-        id:    so.id,
-        ref:   so.number || '—',
-        naam:  so.customerName || so.customerNumber || '—',
-        datum: (so[datumKey] || so.requestedDeliveryDate || so.orderDate || '').substring(0,10),
-        _raw:  so
-      }));
+      // Verkooporders via OData — geeft Due_Date en Promised_Delivery_Date
+      const res = await bcGet(
+        `${BC_SO_ODATA}?$top=200` +
+        `&$select=No,Sell_to_Customer_Name,Sell_to_Customer_No,` +
+        `Due_Date,Promised_Delivery_Date,Requested_Delivery_Date,Order_Date`
+      );
+      const datumKey = _pickerType === 'productie' ? prdDateVeld : trnDateVeld;
+      _pickerAlleOrders = (res.value || []).map(so => {
+        const norm = normalizeerODataOrder(so);
+        return {
+          id:    norm._odataNo,   // ordernummer als sleutel voor OData PATCH
+          ref:   norm.number || '—',
+          naam:  norm.customerName || '—',
+          datum: (norm[datumKey] || norm.requestedDeliveryDate || '').substring(0,10),
+          _raw:  norm
+        };
+      });
     }
     toonPickerLijst(_pickerAlleOrders);
   } catch(e) {
@@ -1965,27 +1992,21 @@ async function kiesOrder(orderId, ref, naam) {
   toon('Datum instellen in BC…');
   try {
     if (_pickerType === 'inkoop') {
-      // Inkoop → expectedReceiptDate (verwachte ontvangstdatum)
+      // Inkoop → REST API, expectedReceiptDate (verwachte ontvangstdatum)
       await bcPatch(`/companies(${bcBedrijfId})/purchaseOrders(${orderId})`,
         { expectedReceiptDate: _pickerDatum });
 
     } else if (_pickerType === 'productie') {
-      // Productie → ALLEEN dueDate (of prdDateVeld). Transport blijft ongewijzigd.
-      await bcPatch(`/companies(${bcBedrijfId})/salesOrders(${orderId})`,
-        { [prdDateVeld]: _pickerDatum });
+      // Productie → OData, Due_Date (vervaldatum/productiedatum)
+      const odataVeld = naarODataVeld(prdDateVeld);
+      await bcPatch(`${BC_SO_ODATA}(No='${encodeURIComponent(orderId)}')`,
+        { [odataVeld]: _pickerDatum });
 
     } else {
-      // Transport → trnDateVeld (toegezegde leverdatum of fallback)
-      const ep = `/companies(${bcBedrijfId})/salesOrders(${orderId})`;
-      try {
-        await bcPatch(ep, { [trnDateVeld]: _pickerDatum });
-      } catch(pErr) {
-        if (pErr.message.includes('Toegezegde') || pErr.message.includes('Dialog')) {
-          toon('⚠ Pas Toegezegde leverdatum handmatig aan in Business Central');
-          return;
-        }
-        throw pErr;
-      }
+      // Transport → OData, Promised_Delivery_Date (toegezegde leverdatum)
+      const odataVeld = naarODataVeld(trnDateVeld);
+      await bcPatch(`${BC_SO_ODATA}(No='${encodeURIComponent(orderId)}')`,
+        { [odataVeld]: _pickerDatum });
     }
     toon('✓ ' + ref + ' ingepland op ' + fDatum(_pickerDatum));
     setTimeout(() => haalData(), 1200);
@@ -2082,7 +2103,8 @@ function toonDetail(idx) {
     rijen += rij('Status',               esc(r.status));
     rijen += rij('Orderdatum',           fDatum((r.orderDate||'').substring(0,10)));
     rijen += rij('Boekingsdatum',        fDatum((r.postingDate||'').substring(0,10)));
-    rijen += rij('Vervaldatum',          fDatum((r.requestedDeliveryDate||'').substring(0,10)));
+    rijen += rij('Verzochte leverdatum',  fDatum((r.requestedDeliveryDate||'').substring(0,10)));
+    rijen += rij('Vervaldatum (productie)',fDatum((r.dueDate||'').substring(0,10)));
     rijen += rij('Toegezegde leverdatum',fDatum((r.promisedDeliveryDate||'').substring(0,10)));
     rijen += rij('Extern documentnr.',   esc(r.externalDocumentNumber));
     rijen += rij('Verkoper',             esc(r.salesperson));
@@ -2094,7 +2116,8 @@ function toonDetail(idx) {
     rijen += rij('Totaal incl. BTW',     r.totalAmountIncludingTax != null ? '€ ' + r.totalAmountIncludingTax.toLocaleString('nl-NL',{minimumFractionDigits:2}) : null, true);
   }
 
-  const orderId = r.id || null;
+  // OData orders hebben geen GUID maar wel een ordernummer als _odataNo
+  const orderId = r.id || r._odataNo || null;
   const detailKnop = orderId && verbonden ? `
     <button class="detail-knop" onclick="haalOrderRegels('${orderId}', '${type}')">
       <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -2118,7 +2141,21 @@ async function haalOrderRegels(orderId, type) {
       endpoint = `/companies(${bcBedrijfId})/purchaseOrders(${orderId})/purchaseOrderLines`;
       labelCol = 'Artikel';
     } else {
-      endpoint = `/companies(${bcBedrijfId})/salesOrders(${orderId})/salesOrderLines`;
+      // Detecteer of orderId een GUID is (REST) of een ordernummer (OData)
+      const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+      let guidVoorRegels = orderId;
+      if (!isGuid) {
+        // OData order: zoek GUID op via REST API (nodig voor orderregels-subendpoint)
+        try {
+          const lookup = await bcGet(`/companies(${bcBedrijfId})/salesOrders?$filter=number eq '${encodeURIComponent(orderId)}'`);
+          guidVoorRegels = lookup.value?.[0]?.id || null;
+        } catch(e) { guidVoorRegels = null; }
+        if (!guidVoorRegels) {
+          sectie.innerHTML = `<div class="regels-sectie"><div class="regels-laadbericht">Orderregels niet beschikbaar (GUID lookup mislukt)</div></div>`;
+          return;
+        }
+      }
+      endpoint = `/companies(${bcBedrijfId})/salesOrders(${guidVoorRegels})/salesOrderLines`;
       labelCol = 'Artikel';
     }
     const res = await bcGet(endpoint);
