@@ -549,6 +549,7 @@ body {
 /* Heeft tekst: toon tekst zonder kader */
 .tile-opm:not(:placeholder-shown):not(:focus) {
   border-color: transparent; opacity: 1; pointer-events: auto; width: 110px; padding: 3px 7px;
+  color: var(--tekst); font-weight: 400;
 }
 /* "+" knop */
 .tile-opm-plus {
@@ -1997,7 +1998,7 @@ function teken() {
               </div>
             </div>`;
           }).join('')
-        : `<div class="leeg">${verbonden ? 'Geen orders in BC' : cat.leeg}</div>`;
+        : ``;
       rijHtml += `<div class="tl-cat-cel ${cat.key}${extra}"
         ondragover="sleepOver(event)"
         ondragleave="sleepWeg(event)"
@@ -2044,7 +2045,7 @@ function teken() {
     rijHtml += `<div class="tl-not-cel${extra}" style="background:var(--wit);border:1px solid var(--lijn);border-radius:0 0 12px 12px;">
       <div class="notitie-label">
         <span style="display:flex;align-items:center;gap:4px">${ICO_PEN}Notitie</span>
-        <button class="not-plus-btn" onclick="nieuwNotitieModal('${ds}')">+ Notitie</button>
+        <button class="cat-plus-btn" onclick="event.stopPropagation();nieuwNotitieModal('${ds}')" title="Notitie toevoegen">+</button>
       </div>
       <div style="padding:5px 7px 2px">${tilesHtml}</div>
     </div>`;
