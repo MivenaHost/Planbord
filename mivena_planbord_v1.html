@@ -399,7 +399,7 @@ body {
 
 .vandaag-pip {
   position: absolute;
-  top: -1px; left: 50%;
+  top: -18px; left: 50%;
   transform: translateX(-50%);
   background: var(--groen-licht);
   color: #fff;
@@ -408,7 +408,8 @@ body {
   letter-spacing: .07em;
   text-transform: uppercase;
   padding: 2px 8px;
-  border-radius: 0 0 7px 7px;
+  border-radius: 7px 7px 0 0;
+  white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════
@@ -506,7 +507,9 @@ body {
 ═══════════════════════════════════════ */
 .item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
   padding: 5px 6px 5px 8px;
   border-left: 2.5px solid transparent;
   border-radius: 0 6px 6px 0;
@@ -516,6 +519,22 @@ body {
 }
 .item:hover { background: rgba(0,0,0,.04); }
 .item + .item { border-top: 1px solid var(--lijn); padding-top: 6px; }
+.item-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tile-opm {
+  flex: 0 0 auto;
+  width: 90px;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--tekst);
+  border: 1px solid var(--lijn);
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: transparent;
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+.tile-opm:focus { border-color: var(--groen-licht); background: #fff; }
+.tile-opm::placeholder { color: var(--muted); opacity: .7; }
 
 .item.inkoop    { border-left-color: var(--blauw); }
 .item.productie { border-left-color: var(--amber); }
@@ -544,21 +563,25 @@ body {
    NOTITIE
 ═══════════════════════════════════════ */
 .tl-not-cel {
-  padding: 7px 9px 9px;
+  padding: 0 0 7px;
 }
 .notitie-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 6px;
+  padding: 6px 11px 5px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #5C4A8A;
+  background: #F3EEFF;
+  border-left: 3px solid #9B7DD4;
+  border-bottom: 1px solid #D9C8F4;
+  margin-bottom: 0;
 }
-.notitie-label svg { width: 10px; height: 10px; }
+.notitie-label svg { width: 12px; height: 12px; opacity: .9; flex: none; }
 .not-plus-btn {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 9.5px; font-weight: 700; color: var(--groen-mid);
@@ -576,7 +599,11 @@ body {
   margin-bottom: 4px;
   cursor: pointer;
   transition: background .1s, border-color .1s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.notitie-tile-content { flex: 1; min-width: 0; }
 .notitie-tile:hover { background: var(--groen-zacht); border-color: var(--groen-licht); }
 .notitie-tile-titel {
   font-size: 11.5px; font-weight: 700; color: var(--tekst);
@@ -893,12 +920,7 @@ body {
 
     <!-- Logo -->
     <div style="margin-bottom:28px">
-      <svg viewBox="0 0 220 80" width="180" height="65" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="110" cy="40" rx="105" ry="37" fill="#1B4332" stroke="#2D6A4F" stroke-width="1.5"/>
-        <ellipse cx="110" cy="40" rx="99" ry="31" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
-        <text x="110" y="34" text-anchor="middle" fill="white" font-family="Georgia,serif" font-size="22" font-weight="700" letter-spacing="3">MIVENA</text>
-        <text x="110" y="52" text-anchor="middle" fill="rgba(255,255,255,.75)" font-family="Arial,sans-serif" font-size="7.5" letter-spacing="2.5">SPECIALTY FERTILIZER COMPANY</text>
-      </svg>
+      <img src="mivena_logo.png" alt="Mivena" style="width:220px;height:auto;display:block;margin:0 auto;background:transparent">
     </div>
 
     <!-- Titel -->
@@ -1278,6 +1300,21 @@ function opslaanNotities() {
 let notities = laadNotities();
 let _notActiefDatum = null;
 let _notActiefId    = null;
+
+/* ══════════════════════════════════════
+   OPMERKINGEN — kort tekstveld per tegel
+══════════════════════════════════════ */
+function laadOpmerkingen() {
+  try { return JSON.parse(localStorage.getItem('mivena_opmerkingen_v1') || '{}'); } catch(e) { return {}; }
+}
+function opslaanOpmerkingen() {
+  try { localStorage.setItem('mivena_opmerkingen_v1', JSON.stringify(opmerkingen)); } catch(e) {}
+}
+let opmerkingen = laadOpmerkingen();
+function slaOpmerking(el, key) {
+  opmerkingen[key] = el.value;
+  opslaanOpmerkingen();
+}
 
 /* ══════════════════════════════════════
    ITEM OPSLAG (voor modal)
@@ -1847,12 +1884,9 @@ function teken() {
   const kgPrd = wPrd.reduce((a,x) => a+(x.hoeveelheid||0), 0);
   const kgTrn = wTrn.reduce((a,x) => a+(x.hoeveelheid||0), 0);
 
-  document.getElementById('totInkoop').textContent =
-    `${(kgInk/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wInk.length}`;
-  document.getElementById('totProductie').textContent =
-    `${(kgPrd/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wPrd.length}`;
-  document.getElementById('totTransport').textContent =
-    `${(kgTrn/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})} t · ${wTrn.length}`;
+  document.getElementById('totInkoop').textContent = `${wInk.length} orders`;
+  document.getElementById('totProductie').textContent = `${wPrd.length} orders`;
+  document.getElementById('totTransport').textContent = `${wTrn.length} orders`;
 
   // Rij-gebaseerde layout
   const tl = document.getElementById('tijdlijn');
@@ -1913,12 +1947,21 @@ function teken() {
         ? items.map(item => {
             const i = bewaar({type: cat.key, item, d});
             const naam = cat.key === 'inkoop' ? (item.leverancier||'—') : (item.klant||'—');
+            const opmKey = `${esc(item.ref||'')}_${cat.key}`;
+            const opmVal = esc(opmerkingen[opmKey] || '');
             return `<div class="item ${cat.key}" draggable="true"
               onclick="toonDetail(${i})"
               ondragstart="startSleep(event,${i})"
               ondragend="stopSleep(event)">
-              <div class="item-naam">${esc(naam)}</div>
-              <div class="item-sub">${esc(item.ref||'—')}</div>
+              <div class="item-content">
+                <div class="item-naam">${esc(naam)}</div>
+                <div class="item-sub">${esc(item.ref||'—')}</div>
+              </div>
+              <input class="tile-opm" type="text" placeholder="opmerking…" value="${opmVal}"
+                onclick="event.stopPropagation()"
+                ondragstart="event.stopPropagation()"
+                onchange="slaOpmerking(this,'${opmKey}')"
+                title="Voeg een korte opmerking toe">
             </div>`;
           }).join('')
         : `<div class="leeg">${verbonden ? 'Geen orders in BC' : cat.leeg}</div>`;
@@ -1944,13 +1987,22 @@ function teken() {
     const tilesHtml = dagNots.map(n => {
       const diaCnt = (n.dialoog||[]).length;
       const tijdStr = n.aangemaakt ? new Date(n.aangemaakt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) + ' ' + new Date(n.aangemaakt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
+      const notOpmKey = `not_${n.id}`;
+      const notOpmVal = esc(opmerkingen[notOpmKey] || '');
       return `<div class="notitie-tile" onclick="toonNotitie('${ds}','${n.id}')">
-        <div class="notitie-tile-titel">${esc(n.titel||'—')}</div>
-        <div class="notitie-tile-meta">
-          <span class="notitie-init">${esc(n.auteur||'?')}</span>
-          <span class="notitie-tijd">${esc(tijdStr)}</span>
-          ${diaCnt ? `<span class="not-dialoog-cnt">+${diaCnt} reactie${diaCnt>1?'s':''}</span>` : ''}
+        <div class="notitie-tile-content">
+          <div class="notitie-tile-titel">${esc(n.titel||'—')}</div>
+          <div class="notitie-tile-meta">
+            <span class="notitie-init">${esc(n.auteur||'?')}</span>
+            <span class="notitie-tijd">${esc(tijdStr)}</span>
+            ${diaCnt ? `<span class="not-dialoog-cnt">+${diaCnt} reactie${diaCnt>1?'s':''}</span>` : ''}
+          </div>
         </div>
+        <input class="tile-opm" type="text" placeholder="opmerking…" value="${notOpmVal}"
+          onclick="event.stopPropagation()"
+          ondragstart="event.stopPropagation()"
+          onchange="slaOpmerking(this,'${notOpmKey}')"
+          title="Voeg een korte opmerking toe">
       </div>`;
     }).join('');
     rijHtml += `<div class="tl-not-cel${extra}" style="background:var(--wit);border:1px solid var(--lijn);border-radius:0 0 12px 12px;">
@@ -1958,7 +2010,7 @@ function teken() {
         <span style="display:flex;align-items:center;gap:4px">${ICO_PEN}Notitie</span>
         <button class="not-plus-btn" onclick="nieuwNotitieModal('${ds}')">+ Notitie</button>
       </div>
-      ${tilesHtml}
+      <div style="padding:5px 7px 2px">${tilesHtml}</div>
     </div>`;
   });
   rijHtml += `</div>`;
