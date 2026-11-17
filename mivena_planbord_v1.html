@@ -521,21 +521,50 @@ body {
 .item:hover { background: rgba(0,0,0,.04); }
 .item + .item { border-top: 1px solid var(--lijn); padding-top: 6px; }
 .item-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ─── Opmerking veld op tegels ─── */
+.item-opm-wrap { position: relative; display: flex; align-items: center; flex: 0 0 auto; }
 .tile-opm {
-  flex: 0 0 auto;
-  width: 110px;
   font-family: inherit;
   font-size: 11px;
-  color: var(--tekst);
-  border: 1px solid #C8D5C0;
+  color: var(--muted);
+  border: 1px solid transparent;
   border-radius: 5px;
   padding: 3px 7px;
-  background: rgba(255,255,255,.7);
+  background: transparent;
   outline: none;
-  transition: border-color .15s, background .15s, box-shadow .15s;
+  transition: width .15s, border-color .15s, background .15s, opacity .1s, padding .15s;
+  width: 110px;
 }
-.tile-opm:focus { border-color: var(--groen-licht); background: #fff; box-shadow: 0 0 0 2px rgba(82,183,136,.18); }
-.tile-opm::placeholder { color: #A0B09A; }
+/* Leeg + niet gefocust: verberg */
+.tile-opm:placeholder-shown:not(:focus) {
+  width: 0; padding: 0; opacity: 0; pointer-events: none;
+}
+/* Gefocust: zichtbaar met kader */
+.tile-opm:focus {
+  border-color: var(--groen-licht); background: #fff;
+  box-shadow: 0 0 0 2px rgba(82,183,136,.18);
+  opacity: 1; pointer-events: auto; width: 110px; padding: 3px 7px;
+}
+/* Heeft tekst: toon tekst zonder kader */
+.tile-opm:not(:placeholder-shown):not(:focus) {
+  border-color: transparent; opacity: 1; pointer-events: auto; width: 110px; padding: 3px 7px;
+}
+/* "+" knop */
+.tile-opm-plus {
+  display: none; align-items: center; justify-content: center;
+  width: 17px; height: 17px; font-size: 15px; font-weight: 300; line-height: 1;
+  color: var(--groen-mid); background: var(--groen-zacht);
+  border: 1px solid var(--groen-licht); border-radius: 50%;
+  cursor: pointer; padding: 0; transition: background .1s;
+}
+.tile-opm-plus:hover { background: #C0EBD0; }
+/* Toon "+" op hover van parent-tegel */
+.item:hover .tile-opm-plus,
+.notitie-tile:hover .tile-opm-plus { display: flex; }
+/* Verberg "+" als veld tekst heeft of gefocust is */
+.tile-opm:not(:placeholder-shown) + .tile-opm-plus,
+.tile-opm:focus + .tile-opm-plus { display: none !important; }
 
 .item.inkoop    { border-left-color: var(--blauw); }
 .item.productie { border-left-color: var(--amber); }
@@ -1958,11 +1987,14 @@ function teken() {
                 <div class="item-naam">${esc(naam)}</div>
                 <div class="item-sub">${esc(item.ref||'—')}</div>
               </div>
-              <input class="tile-opm" type="text" placeholder="opmerking…" value="${opmVal}"
-                onclick="event.stopPropagation()"
-                ondragstart="event.stopPropagation()"
-                onchange="slaOpmerking(this,'${opmKey}')"
-                title="Voeg een korte opmerking toe">
+              <div class="item-opm-wrap">
+                <input class="tile-opm" type="text" placeholder="opmerking…" value="${opmVal}"
+                  onclick="event.stopPropagation()"
+                  ondragstart="event.stopPropagation()"
+                  onchange="slaOpmerking(this,'${opmKey}')"
+                  title="Opmerking toevoegen">
+                <button class="tile-opm-plus" onclick="event.stopPropagation();this.previousElementSibling.focus()" tabindex="-1" title="Opmerking toevoegen">+</button>
+              </div>
             </div>`;
           }).join('')
         : `<div class="leeg">${verbonden ? 'Geen orders in BC' : cat.leeg}</div>`;
@@ -1999,11 +2031,14 @@ function teken() {
             ${diaCnt ? `<span class="not-dialoog-cnt">+${diaCnt} reactie${diaCnt>1?'s':''}</span>` : ''}
           </div>
         </div>
-        <input class="tile-opm" type="text" placeholder="opmerking…" value="${notOpmVal}"
-          onclick="event.stopPropagation()"
-          ondragstart="event.stopPropagation()"
-          onchange="slaOpmerking(this,'${notOpmKey}')"
-          title="Voeg een korte opmerking toe">
+        <div class="item-opm-wrap">
+          <input class="tile-opm" type="text" placeholder="opmerking…" value="${notOpmVal}"
+            onclick="event.stopPropagation()"
+            ondragstart="event.stopPropagation()"
+            onchange="slaOpmerking(this,'${notOpmKey}')"
+            title="Opmerking toevoegen">
+          <button class="tile-opm-plus" onclick="event.stopPropagation();this.previousElementSibling.focus()" tabindex="-1" title="Opmerking toevoegen">+</button>
+        </div>
       </div>`;
     }).join('');
     rijHtml += `<div class="tl-not-cel${extra}" style="background:var(--wit);border:1px solid var(--lijn);border-radius:0 0 12px 12px;">
