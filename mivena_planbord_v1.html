@@ -950,8 +950,9 @@ body {
     text-align:center">
 
     <!-- Logo -->
-    <div style="margin-bottom:28px">
-      <img src="mivena_logo.png" alt="Mivena" style="width:220px;height:auto;display:block;margin:0 auto;background:transparent">
+    <div style="margin-bottom:28px;text-align:center">
+      <div style="font-family:'Manrope',sans-serif;font-size:36px;font-weight:800;letter-spacing:.12em;color:#1B4332">MIVENA</div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.25em;color:#52B788;text-transform:uppercase;margin-top:3px">Specialty Fertilizer Company</div>
     </div>
 
     <!-- Titel -->
@@ -1230,7 +1231,7 @@ body {
 /* ══════════════════════════════════════
    BC CONFIGURATIE
 ══════════════════════════════════════ */
-const VERSIE     = '2.0';
+const VERSIE     = '2.1';
 const BC_TENANT  = 'ff954f83-094a-461a-95f0-cb27bddcd2fc';
 const BC_CLIENT  = 'a9cf76ae-6515-4930-98cc-b0aaecc7c7a9';
 const BC_REDIR   = window.location.href.split('?')[0].split('#')[0];
@@ -1240,6 +1241,13 @@ const BC_SCOPE   = 'https://api.businesscentral.dynamics.com/user_impersonation'
 const BC_API     = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/api/v2.0`;
 const BC_ODATA   = `https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT}/${BC_ENV}/ODataV4`;
 const BC_SO_ODATA = `${BC_ODATA}/Company('${encodeURIComponent(BC_CO_NAAM)}')/SalesOrder`;
+
+/* ── SharePoint / Graph ── */
+const GRAPH_API    = 'https://graph.microsoft.com/v1.0';
+const GRAPH_SCOPE  = 'https://graph.microsoft.com/Sites.ReadWrite.All';
+const SP_HOST      = 'mivenaholdingbv.sharepoint.com';
+const SP_LIJST_NOT = 'PlanbordNotities';
+const SP_LIJST_OPM = 'PlanbordOpmerkingen';
 
 // Mapping: genormaliseerde camelCase veldnaam → OData veldnaam (voor PATCH)
 const ODATA_VELD_MAP = {
@@ -1343,8 +1351,175 @@ function opslaanOpmerkingen() {
 }
 let opmerkingen = laadOpmerkingen();
 function slaOpmerking(el, key) {
-  opmerkingen[key] = el.value;
-  opslaanOpmerkingen();
+  const val = el.value;
+  opmerkingen[key] = val;
+  opslaanOpmerkingen(); // localStorage backup
+  spSlaOpmerking(key, val).catch(e => console.warn('SP opmerking mislukt:', e));
+}
+
+/* ══════════════════════════════════════
+   SHAREPOINT / GRAPH API INTEGRATIE
+══════════════════════════════════════ */
+let spSiteId       = null;
+let spNotListId    = null;
+let spOpmListId    = null;
+let spNotItemIds   = {}; // datum  → SP item id
+let spOpmItemIds   = {}; // key    → SP item id
+let spGereed       = false;
+
+async function getGraphToken() {
+  const account = msalApp?.getAllAccounts()?.[0];
+  if (!account) throw new Error('Niet ingelogd');
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: [GRAPH_SCOPE], account });
+    return r.accessToken;
+  } catch(e) {
+    if (e.name === 'InteractionRequiredAuthError') {
+      await msalApp.acquireTokenRedirect({ scopes: [GRAPH_SCOPE] });
+    }
+    throw e;
+  }
+}
+
+async function graphGet(url) {
+  const token = await getGraphToken();
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+  if (!r.ok) throw new Error(`Graph GET ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+async function graphPost(url, body) {
+  const token = await getGraphToken();
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Graph POST ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+async function graphPatch(url, body) {
+  const token = await getGraphToken();
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Graph PATCH ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+async function graphDelete(url) {
+  const token = await getGraphToken();
+  const r = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok && r.status !== 404) throw new Error(`Graph DELETE ${r.status}`);
+}
+
+async function spZorgKolom(listId, naam, multiLine) {
+  try {
+    const cols = await graphGet(`${GRAPH_API}/sites/${spSiteId}/lists/${listId}/columns`);
+    if ((cols.value||[]).some(c => c.name === naam)) return;
+    await graphPost(`${GRAPH_API}/sites/${spSiteId}/lists/${listId}/columns`,
+      { name: naam, text: { allowMultipleLines: multiLine } });
+  } catch(e) { console.warn('spZorgKolom:', naam, e.message); }
+}
+
+async function initSharePoint() {
+  try {
+    toon('SharePoint verbinden…');
+    const site = await graphGet(`${GRAPH_API}/sites/${SP_HOST}:`);
+    spSiteId = site.id;
+
+    const lNot = await graphGet(`${GRAPH_API}/sites/${spSiteId}/lists/${SP_LIJST_NOT}`);
+    spNotListId = lNot.id;
+    const lOpm = await graphGet(`${GRAPH_API}/sites/${spSiteId}/lists/${SP_LIJST_OPM}`);
+    spOpmListId = lOpm.id;
+
+    // Kolommen aanmaken als ze nog niet bestaan
+    await spZorgKolom(spNotListId, 'Data',   true);
+    await spZorgKolom(spOpmListId, 'Waarde', false);
+
+    // Data laden
+    await spLaadNotities();
+    await spLaadOpmerkingen();
+
+    spGereed = true;
+    toon('✓ SharePoint verbonden');
+  } catch(e) {
+    console.warn('SharePoint init mislukt (localStorage fallback):', e.message);
+    spGereed = false;
+  }
+}
+
+async function spLaadNotities() {
+  const res = await graphGet(
+    `${GRAPH_API}/sites/${spSiteId}/lists/${spNotListId}/items?$expand=fields&$top=500`
+  );
+  notities = {};
+  spNotItemIds = {};
+  (res.value || []).forEach(item => {
+    const datum = item.fields?.Title;
+    const data  = item.fields?.Data;
+    if (!datum) return;
+    try { notities[datum] = JSON.parse(data || '[]'); } catch(e) { notities[datum] = []; }
+    spNotItemIds[datum] = item.id;
+  });
+}
+
+async function spLaadOpmerkingen() {
+  const res = await graphGet(
+    `${GRAPH_API}/sites/${spSiteId}/lists/${spOpmListId}/items?$expand=fields&$top=1000`
+  );
+  opmerkingen = {};
+  spOpmItemIds = {};
+  (res.value || []).forEach(item => {
+    const key    = item.fields?.Title;
+    const waarde = item.fields?.Waarde || '';
+    if (!key) return;
+    opmerkingen[key] = waarde;
+    spOpmItemIds[key] = item.id;
+  });
+}
+
+async function spSlaNotities(ds) {
+  if (!spGereed) { opslaanNotities(); return; }
+  try {
+    const data = JSON.stringify(notities[ds] || []);
+    const spId = spNotItemIds[ds];
+    if (spId) {
+      await graphPatch(
+        `${GRAPH_API}/sites/${spSiteId}/lists/${spNotListId}/items/${spId}/fields`,
+        { Data: data }
+      );
+    } else {
+      const r = await graphPost(
+        `${GRAPH_API}/sites/${spSiteId}/lists/${spNotListId}/items`,
+        { fields: { Title: ds, Data: data } }
+      );
+      spNotItemIds[ds] = r.id;
+    }
+    opslaanNotities(); // ook lokale backup
+  } catch(e) {
+    console.warn('SP notities opslaan mislukt:', e.message);
+    opslaanNotities();
+  }
+}
+
+async function spSlaOpmerking(key, value) {
+  if (!spGereed) return;
+  try {
+    const spId = spOpmItemIds[key];
+    if (spId) {
+      await graphPatch(
+        `${GRAPH_API}/sites/${spSiteId}/lists/${spOpmListId}/items/${spId}/fields`,
+        { Waarde: value }
+      );
+    } else {
+      const r = await graphPost(
+        `${GRAPH_API}/sites/${spSiteId}/lists/${spOpmListId}/items`,
+        { fields: { Title: key, Waarde: value } }
+      );
+      spOpmItemIds[key] = r.id;
+    }
+  } catch(e) { console.warn('SP opmerking opslaan mislukt:', e.message); }
 }
 
 /* ══════════════════════════════════════
@@ -1506,6 +1681,7 @@ async function bijVerbonden(res) {
   startAutoRefresh();
 
   toon('Verbonden met ' + bedrijf.name);
+  await initSharePoint();
   await haalData();
 }
 
@@ -1681,6 +1857,11 @@ let inkVeldActief  = 'requestedReceiptDate'; // wordt ingesteld door haalData na
 
 async function haalData() {
   if (!verbonden || !bcBedrijfId) return;
+  // Herlaad SP-data bij elke refresh zodat wijzigingen van andere gebruikers zichtbaar worden
+  if (spGereed) {
+    spLaadNotities().catch(e => console.warn('SP notities herlaad mislukt:', e));
+    spLaadOpmerkingen().catch(e => console.warn('SP opm herlaad mislukt:', e));
+  }
 
   const dagen = weekDagen(pagina);
   const van   = iso(dagen[0]);
@@ -2090,7 +2271,7 @@ function slaaNieuweNotitieOp() {
   const ds = _notActiefDatum;
   if (!notities[ds]) notities[ds] = [];
   notities[ds].push({ id: genId(), titel, inhoud, auteur: gebruikerInit, aangemaakt: Date.now(), dialoog: [] });
-  opslaanNotities();
+  spSlaNotities(ds).catch(e => console.warn(e));
   sluitNieuwNotitie();
   teken();
 }
@@ -2162,7 +2343,7 @@ function voegReactieToe() {
   if (!n) return;
   if (!n.dialoog) n.dialoog = [];
   n.dialoog.push({ auteur: gebruikerInit, tekst, aangemaakt: Date.now() });
-  opslaanNotities();
+  spSlaNotities(_notActiefDatum).catch(e => console.warn(e));
   teken();
   toonNotitie(_notActiefDatum, _notActiefId); // herlaad modal
 }
@@ -2176,8 +2357,9 @@ function verwijderNotitie() {
   if (!confirm('Notitie verwijderen?')) return;
   const nots = notities[_notActiefDatum] || [];
   notities[_notActiefDatum] = nots.filter(n => n.id !== _notActiefId);
-  if (!notities[_notActiefDatum].length) delete notities[_notActiefDatum];
-  opslaanNotities();
+  const _dsVrw = _notActiefDatum;
+  if (!notities[_dsVrw].length) delete notities[_dsVrw];
+  spSlaNotities(_dsVrw).catch(e => console.warn(e));
   sluitNotitieModal();
   teken();
 }
